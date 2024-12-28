@@ -13,8 +13,14 @@ class GameScreen:
     def setup_ui(self):
         # Configure dark theme
         self.root.configure(bg='#1a1a1a')
-        self.root.grid_rowconfigure(0, weight=1)  # Add this line
-        self.root.grid_columnconfigure(0, weight=1)  # Add this line
+        
+        # Ensure window maximizes properly
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        self.root.geometry(f"{screen_width}x{screen_height}")
+        
+        self.root.grid_rowconfigure(0, weight=1)
+        self.root.grid_columnconfigure(0, weight=1)
         style = ttk.Style()
         style.theme_use('default')
         style.configure('TFrame', background='#1a1a1a')

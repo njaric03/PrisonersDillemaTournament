@@ -11,10 +11,16 @@ class TournamentScreen:
         self.setup_ui()
 
     def setup_ui(self):
-        # Configure dark theme
+        # Configure dark theme and ensure proper window size
         self.root.configure(bg='#1a1a1a')
-        self.root.grid_rowconfigure(0, weight=1)  # Add this line
-        self.root.grid_columnconfigure(0, weight=1)  # Add this line
+        
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        self.root.geometry(f"{screen_width}x{screen_height}")
+        
+        self.root.grid_rowconfigure(0, weight=1)
+        self.root.grid_columnconfigure(0, weight=1)
+        
         style = ttk.Style()
         style.theme_use('default')
         style.configure('TFrame', background='#1a1a1a')
@@ -53,13 +59,12 @@ class TournamentScreen:
                               wraplength=800)
         description.grid(row=2, column=0, pady=(0, 20))
         
-        # Create the tournament UI
-        self.game_ui = GameUI(self.main_frame)  # Store as instance variable
+        # Create the game UI
+        self.game_ui = GameUI(self.main_frame)
         self.game_ui.main_frame.grid(row=3, column=0, sticky="nsew")
         self.game_ui.bot_listbox.configure(selectmode=tk.MULTIPLE)
-        self.game_ui.custom_bot_listbox.configure(selectmode=tk.MULTIPLE)  # Set custom bots listbox to MULTIPLE
         
-        # Create bottom button frame
+        # Create bottom button frame (in row 4)
         button_frame = ttk.Frame(self.main_frame, style='TFrame')
         button_frame.grid(row=4, column=0, sticky="ew", pady=(10, 0))
         button_frame.grid_columnconfigure(0, weight=0)  # Back button

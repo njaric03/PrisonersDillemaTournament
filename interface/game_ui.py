@@ -10,6 +10,10 @@ class GameUI:
     def __init__(self, parent):
         self.parent = parent
         
+        # Get screen dimensions
+        screen_width = parent.winfo_screenwidth()
+        screen_height = parent.winfo_screenheight()
+        
         # Initialize variables first
         self.available_bots = self.load_bots()
         self.filename_to_display = {}
@@ -31,9 +35,13 @@ class GameUI:
         style.configure('TLabel', background='#1a1a1a', foreground='white')
         style.configure('TRadiobutton', background='#1a1a1a', foreground='white')
         
-        # Create main frame with padding
+        # Create main frame with padding and explicit minimum size
         self.main_frame = ttk.Frame(parent, padding="20", style='TFrame')  # Made it instance variable
         self.main_frame.grid(row=1, column=0, sticky="nsew")  # Changed row from 0 to 1
+        
+        # Ensure minimum size for main frame
+        self.main_frame.grid_propagate(False)
+        self.main_frame.configure(width=screen_width-100, height=screen_height-200)
         
         # Configure all grid weights for vertical expansion
         self.main_frame.grid_rowconfigure(0, weight=1)  # Main content row
@@ -43,16 +51,28 @@ class GameUI:
 
         # Left and right frames need vertical expansion
         left_frame = ttk.LabelFrame(self.main_frame, text="Player 1", padding="10")
+        center_frame = ttk.LabelFrame(self.main_frame, text="Simulation Log", padding="10")
         right_frame = ttk.LabelFrame(self.main_frame, text="Player 2", padding="10")
         
-        # Make frames expand vertically
-        left_frame.grid(row=0, column=0, sticky="nsew", padx=20, pady=20)
-        right_frame.grid(row=0, column=2, sticky="nsew", padx=20, pady=20)
+        # Make frames expand vertically and give them more weight
+        left_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=20)
+        center_frame.grid(row=0, column=1, sticky="nsew", pady=20)
+        right_frame.grid(row=0, column=2, sticky="nsew", padx=10, pady=20)
         
-        # Configure vertical expansion for frames
-        left_frame.grid_rowconfigure(0, weight=1)
-        right_frame.grid_rowconfigure(0, weight=1)
+        # Configure vertical expansion for frames with more weight
+        for frame in [left_frame, center_frame, right_frame]:
+            frame.grid_rowconfigure(0, weight=3)  # Increased weight
+            frame.grid_columnconfigure(0, weight=1)
 
+        # Add log text widget in center frame with expanded height
+        self.log_text = tk.Text(center_frame, width=50, height=20, bg='#2a2a2a', fg='white',
+                               font=('Courier', 10))
+        log_scrollbar = ttk.Scrollbar(center_frame, orient="vertical", command=self.log_text.yview)
+        self.log_text.configure(yscrollcommand=log_scrollbar.set)
+        
+        self.log_text.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+        log_scrollbar.grid(row=0, column=1, sticky="ns")
+        
         # Left frame content (Player 1)
         ttk.Label(left_frame, text="Select Bot File:").pack(pady=5)
         self.player1_path = tk.StringVar()
@@ -64,9 +84,9 @@ class GameUI:
         
         # Single listbox with scrollbar for all bots
         listbox_frame = ttk.Frame(right_frame)
-        listbox_frame.pack(fill=tk.BOTH, expand=True, pady=2)
+        listbox_frame.pack(fill=tk.BOTH, expand=True, pady=5)
         
-        self.bot_listbox = tk.Listbox(listbox_frame, width=47, height=12)
+        self.bot_listbox = tk.Listbox(listbox_frame, width=47, height=20)  # Increased height
         scrollbar = ttk.Scrollbar(listbox_frame, orient="vertical", command=self.bot_listbox.yview)
         self.bot_listbox.configure(yscrollcommand=scrollbar.set)
         
@@ -275,6 +295,11 @@ class GameUI:
         self.current_item = -1
         self.tooltip_id = None
 
+    def update_log(self, text):
+        self.log_text.delete(1.0, tk.END)
+        self.log_text.insert(tk.END, text)
+        self.log_text.see(tk.END)
+
     def start_games(self):
         """Pairwise run, final results in Games_summary.txt."""
         player1_bot = self.player1_path.get()
@@ -290,6 +315,16 @@ class GameUI:
         try:
             simulation = PrisonersDilemmaSimulation(player1_bot)
             simulation.run_games(opponents, 100)
+            
+            # Read and display the latest log file
+            logs_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'logs')
+            latest_dir = max([os.path.join(logs_dir, d) for d in os.listdir(logs_dir)],
+                           key=os.path.getmtime)
+            for file in os.listdir(latest_dir):
+                if file.endswith('.txt'):
+                    with open(os.path.join(latest_dir, file), 'r') as f:
+                        self.update_log(f.read())
+                    break
         except Exception as e:
             tk.messagebox.showerror("Error", f"Simulation failed: {str(e)}")
 
