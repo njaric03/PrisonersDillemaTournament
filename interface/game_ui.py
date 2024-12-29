@@ -7,8 +7,16 @@ from simulation.simulate_tournament import TournamentSimulation
 from simulation.simulate_games import PrisonersDilemmaSimulation
 
 class GameUI:
-    def __init__(self, parent):
+    def __init__(self, parent, use_checkboxes=False):
+        # Add mode detection based on window title
+        self.mode = "game"  # default mode
+        if parent.winfo_toplevel().title() == "Tournament Mode":
+            self.mode = "tournament"
+        elif parent.winfo_toplevel().title() == "Test Against Multiple Opponents":
+            self.mode = "multiple"
+            
         self.parent = parent
+        self.use_checkboxes = use_checkboxes
         
         # Get screen dimensions
         screen_width = parent.winfo_screenwidth()
@@ -50,43 +58,43 @@ class GameUI:
         self.main_frame.grid_columnconfigure(2, weight=1)  # Right frame
 
         # Left and right frames need vertical expansion
-        left_frame = ttk.LabelFrame(self.main_frame, text="Player 1", padding="10")
-        center_frame = ttk.LabelFrame(self.main_frame, text="Simulation Log", padding="10")
-        right_frame = ttk.LabelFrame(self.main_frame, text="Player 2", padding="10")
+        self.left_frame = ttk.LabelFrame(self.main_frame, text="Player 1", padding="10")
+        self.center_frame = ttk.LabelFrame(self.main_frame, text="Simulation Log", padding="10")
+        self.right_frame = ttk.LabelFrame(self.main_frame, text="Player 2", padding="10")
         
         # Make frames expand vertically and give them more weight
-        left_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=20)
-        center_frame.grid(row=0, column=1, sticky="nsew", pady=20)
-        right_frame.grid(row=0, column=2, sticky="nsew", padx=10, pady=20)
+        self.left_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=20)
+        self.center_frame.grid(row=0, column=1, sticky="nsew", pady=20)
+        self.right_frame.grid(row=0, column=2, sticky="nsew", padx=10, pady=20)
         
         # Configure vertical expansion for frames with more weight
-        for frame in [left_frame, center_frame, right_frame]:
+        for frame in [self.left_frame, self.center_frame, self.right_frame]:
             frame.grid_rowconfigure(0, weight=3)  # Increased weight
             frame.grid_columnconfigure(0, weight=1)
 
         # Add log text widget in center frame with expanded height
-        self.log_text = tk.Text(center_frame, width=50, height=20, bg='#2a2a2a', fg='white',
+        self.log_text = tk.Text(self.center_frame, width=50, height=20, bg='#2a2a2a', fg='white',
                                font=('Courier', 10))
-        log_scrollbar = ttk.Scrollbar(center_frame, orient="vertical", command=self.log_text.yview)
+        log_scrollbar = ttk.Scrollbar(self.center_frame, orient="vertical", command=self.log_text.yview)
         self.log_text.configure(yscrollcommand=log_scrollbar.set)
         
         self.log_text.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
         log_scrollbar.grid(row=0, column=1, sticky="ns")
         
         # Left frame content (Player 1)
-        ttk.Label(left_frame, text="Select Bot File:").pack(pady=5)
+        ttk.Label(self.left_frame, text="Select Bot File:").pack(pady=5)
         self.player1_path = tk.StringVar()
-        ttk.Entry(left_frame, textvariable=self.player1_path, width=50).pack(pady=5)
-        ttk.Button(left_frame, text="Browse", command=self.browse_file).pack(pady=5)
+        ttk.Entry(self.left_frame, textvariable=self.player1_path, width=50).pack(pady=5)
+        ttk.Button(self.left_frame, text="Browse", command=self.browse_file).pack(pady=5)
 
         # Right frame content (Player 2)
-        ttk.Label(right_frame, text="Available Bots:", font=('Helvetica', 10, 'bold')).pack(pady=(5,2))
+        ttk.Label(self.right_frame, text="Available Bots:").pack(pady=5)
         
-        # Single listbox with scrollbar for all bots
-        listbox_frame = ttk.Frame(right_frame)
-        listbox_frame.pack(fill=tk.BOTH, expand=True, pady=5)
+        # Create listbox with scrollbar
+        listbox_frame = ttk.Frame(self.right_frame)
+        listbox_frame.pack(fill=tk.BOTH, expand=True)
         
-        self.bot_listbox = tk.Listbox(listbox_frame, width=47, height=20)  # Increased height
+        self.bot_listbox = tk.Listbox(listbox_frame)
         scrollbar = ttk.Scrollbar(listbox_frame, orient="vertical", command=self.bot_listbox.yview)
         self.bot_listbox.configure(yscrollcommand=scrollbar.set)
         
@@ -95,26 +103,16 @@ class GameUI:
         
         self.update_bot_dropdown()
         
+        ttk.Button(self.right_frame, text="Add Custom Bot", command=self.add_custom_bot).pack(pady=5)
+
         # Create tooltip
         self.tooltip = None
-        self.tooltip_id = None  # For managing hide delay
-        self.current_item = -1  # Track current item under mouse
-        
+        self.tooltip_id = None
+        self.current_item = -1
+
         # Bind mouse events
         self.bot_listbox.bind('<Motion>', self.schedule_tooltip)
         self.bot_listbox.bind('<Leave>', self.schedule_hide_tooltip)
-        
-        # Add bot button frame (removed description label)
-        button_frame = ttk.Frame(right_frame)
-        button_frame.pack(pady=5)
-        
-        ttk.Button(button_frame, text="Add Custom Bot", command=self.add_custom_bot).pack(padx=5)
-
-        # Remove old buttons and entry
-        self.game_button = None
-        self.tournament_button = None
-        self.player2_path = None
-        self.player2_entry = None
 
     def add_custom_bot(self):
         filepath = filedialog.askopenfilename(
@@ -187,29 +185,24 @@ class GameUI:
         
         if not os.path.exists(bots_dir):
             os.makedirs(bots_dir)
-            print(f"Created bots directory at: {bots_dir}")
             return bots
             
-        print(f"Loading bots from: {bots_dir}")
         for filename in os.listdir(bots_dir):
             if filename.endswith('.py') and not filename.startswith('__'):
                 filepath = os.path.normpath(os.path.join(bots_dir, filename))
                 try:
-                    print(f"Attempting to load bot from: {filepath}")
                     spec = importlib.util.spec_from_file_location(filename[:-3], filepath)
                     module = importlib.util.module_from_spec(spec)
                     spec.loader.exec_module(module)
                     
-                    # Find the bot class in the module
                     for item in dir(module):
                         obj = getattr(module, item)
                         if isinstance(obj, type) and issubclass(obj, AbstractBot) and obj != AbstractBot:
                             bot_instance = obj()
                             bots[filename] = bot_instance
-                            print(f"Successfully loaded bot: {bot_instance.name} from {filename}")
                             break
                 except Exception as e:
-                    print(f"Error loading bot {filename}: {str(e)}")
+                    continue
                     
         return bots
 
@@ -300,11 +293,54 @@ class GameUI:
         self.log_text.insert(tk.END, text)
         self.log_text.see(tk.END)
 
+    def read_latest_log(self, summary_type="game"):
+        """Read the latest log file of specified type"""
+        logs_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'logs')
+        try:
+            # Get all directories sorted by creation time
+            dirs = [d for d in os.listdir(logs_dir) if os.path.isdir(os.path.join(logs_dir, d))]
+            if not dirs:
+                return "No log directories found"
+                
+            # Find latest directory based on type
+            if summary_type == "tournament":
+                tournament_dirs = [d for d in dirs if "tournament" in d]
+                if not tournament_dirs:
+                    return "No tournament logs found"
+                latest_dir = max(tournament_dirs, key=lambda d: d.split('_')[0])
+                filepath = os.path.join(logs_dir, latest_dir, "tournament_summary.txt")
+            else:
+                # For game or games_summary
+                game_dirs = [d for d in dirs if "games" in d]
+                if not game_dirs:
+                    return "No game logs found"
+                latest_dir = max(game_dirs, key=lambda d: d.split('_')[0])
+                if summary_type == "game":
+                    # Find latest vs file
+                    game_files = [f for f in os.listdir(os.path.join(logs_dir, latest_dir)) 
+                                if f.endswith('.txt') and '_vs_' in f]
+                    if not game_files:
+                        return "No game logs found in directory"
+                    latest_file = max(game_files, key=lambda f: os.path.getmtime(
+                        os.path.join(logs_dir, latest_dir, f)))
+                    filepath = os.path.join(logs_dir, latest_dir, latest_file)
+                else:
+                    filepath = os.path.join(logs_dir, latest_dir, "games_summary.txt")
+                    
+            # Read and return the content
+            if os.path.exists(filepath):
+                with open(filepath, 'r') as f:
+                    return f.read()
+            return f"Log file not found: {filepath}"
+            
+        except Exception as e:
+            return f"Error reading log: {str(e)}"
+
     def start_games(self):
-        """Pairwise run, final results in Games_summary.txt."""
+        """Run games based on mode."""
         player1_bot = self.player1_path.get()
         if not player1_bot:
-            tk.messagebox.showerror("Error", "Please select Player 1 bot")
+            tk.messagebox.showerror("Error", "Please select Player bot")
             return
 
         opponents = self.get_selected_bots()
@@ -314,46 +350,90 @@ class GameUI:
 
         try:
             simulation = PrisonersDilemmaSimulation(player1_bot)
-            simulation.run_games(opponents, 100)
-            
-            # Read and display the latest log file
-            logs_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'logs')
-            latest_dir = max([os.path.join(logs_dir, d) for d in os.listdir(logs_dir)],
-                           key=os.path.getmtime)
-            for file in os.listdir(latest_dir):
-                if file.endswith('.txt'):
-                    with open(os.path.join(latest_dir, file), 'r') as f:
-                        self.update_log(f.read())
-                    break
+            if self.mode == "game":
+                # For single game mode, only use first selected opponent
+                simulation.run_games([opponents[0]], 100)
+                # Look for the specific game log
+                self.update_log(self.read_latest_log("game"))
+            else:
+                # For multiple test mode
+                simulation.run_games(opponents, 100)
+                self.update_log(self.read_latest_log("games_summary"))
+                    
         except Exception as e:
             tk.messagebox.showerror("Error", f"Simulation failed: {str(e)}")
+
+    def load_bot(self, bot_path):
+        """Load a bot from a file path."""
+        try:
+            spec = importlib.util.spec_from_file_location("bot_module", bot_path)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            
+            for item in dir(module):
+                obj = getattr(module, item)
+                if isinstance(obj, type) and issubclass(obj, AbstractBot) and obj != AbstractBot:
+                    return obj()
+            raise ValueError("No valid bot class found in file")
+        except Exception as e:
+            raise Exception(f"Failed to load bot: {str(e)}")
 
     def start_tournament(self):
         """Round-robin tournament, results in Tournament_summary.txt."""
         player1_bot = self.player1_path.get()
         if not player1_bot:
-            tk.messagebox.showerror("Error", "Please select Player 1 bot")
+            tk.messagebox.showerror("Error", "Please select Player bot")
             return
 
         try:
-            simulation = TournamentSimulation(player1_bot)
-            player1_name = simulation.bot1.name
-            
-            bot_paths = [player1_bot]
-            
+            # Load player's bot to get its name
+            player_bot = self.load_bot(player1_bot)
+            player_bot_name = player_bot.name
+
+            # Get selected opponents
             selected_bots = self.get_selected_bots()
             if not selected_bots:
                 tk.messagebox.showerror("Error", "Please select at least one opponent")
                 return
-                
-            for bot_path in selected_bots:
-                temp_sim = TournamentSimulation(bot_path)
-                if temp_sim.bot1.name == player1_name:
-                    tk.messagebox.showerror("Error", "Player 1 bot cannot be the same as an opponent bot")
-                    return
-                bot_paths.append(bot_path)
 
-            simulation.run_all_against_all(bot_paths, 100)
+            # Check if player's bot is among opponents
+            for opponent_path in selected_bots:
+                opponent_bot = self.load_bot(opponent_path)
+                if opponent_bot.name == player_bot_name:
+                    tk.messagebox.showerror("Error", "Player's bot cannot be selected as an opponent")
+                    return
+
+            # Create tournament simulator with player1's bot path
+            simulator = TournamentSimulation(player1_bot)
+            bot_paths = [player1_bot]
+            bot_paths.extend(selected_bots)
             
+            # Run the tournament with all bots
+            simulator.run_all_against_all(bot_paths)
+            
+            # Update the log with tournament results
+            self.update_log(self.read_latest_log("tournament"))
         except Exception as e:
             tk.messagebox.showerror("Error", f"Tournament failed: {str(e)}")
+
+    def populate_bot_list(self):
+        self.bot_listbox.delete(0, tk.END)
+        for bot in self.available_bots:
+            if self.use_checkboxes:
+                self.bot_listbox.insert(tk.END, f"☐ {bot}")
+            else:
+                self.bot_listbox.insert(tk.END, bot)
+
+    def on_select(self, event):
+        if not self.use_checkboxes:
+            return
+            
+        selection = self.bot_listbox.curselection()
+        for index in selection:
+            current = self.bot_listbox.get(index)
+            if current.startswith("������"):
+                self.bot_listbox.delete(index)
+                self.bot_listbox.insert(index, f"☑ {current[2:]}")
+            else:
+                self.bot_listbox.delete(index)
+                self.bot_listbox.insert(index, f"☐ {current[2:]}")

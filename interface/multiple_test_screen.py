@@ -23,7 +23,11 @@ class MultipleTestScreen:
         style = ttk.Style()
         style.theme_use('default')
         style.configure('TFrame', background='#1a1a1a')
-        style.configure('TButton', padding=10, width=30)
+        style.configure('TButton', padding=10, width=30)  # Removed custom button styling
+        
+        style.map('TButton',
+                 background=[('active', '#3a3a3a')],
+                 foreground=[('active', 'white')])
         
         # Create main frame
         self.main_frame = ttk.Frame(self.root, padding="20")
@@ -58,10 +62,19 @@ class MultipleTestScreen:
                               wraplength=800)
         description.grid(row=2, column=0, pady=(0, 20))
         
-        # Create the game UI
-        self.game_ui = GameUI(self.main_frame)
+        # Create the game UI with checkbox listbox
+        self.game_ui = GameUI(self.main_frame, use_checkboxes=True)
         self.game_ui.main_frame.grid(row=3, column=0, sticky="nsew")
-        self.game_ui.bot_listbox.configure(selectmode=tk.MULTIPLE)  # Remove the custom_bot_listbox line
+        self.game_ui.bot_listbox.configure(selectmode=tk.MULTIPLE)
+        
+        # Add select all button to the game UI's right frame above listbox
+        self.select_all_var = tk.BooleanVar()
+        self.select_all_btn = ttk.Checkbutton(
+            self.game_ui.right_frame,  # Changed back to right_frame
+            text="Select All",
+            variable=self.select_all_var,
+            command=self.toggle_select_all)
+        self.select_all_btn.pack(before=self.game_ui.bot_listbox, pady=(5,0), anchor="w")
         
         # Create bottom button frame (in row 4)
         button_frame = ttk.Frame(self.main_frame, style='TFrame')
@@ -83,6 +96,12 @@ class MultipleTestScreen:
                   style='TButton',
                   width=15,
                   command=self.start_games).grid(row=0, column=2, padx=5)
+
+    def toggle_select_all(self):
+        if self.select_all_var.get():
+            self.game_ui.bot_listbox.select_set(0, tk.END)
+        else:
+            self.game_ui.bot_listbox.selection_clear(0, tk.END)
 
     def start_games(self):
         self.game_ui.start_games()  # Now using the stored instance

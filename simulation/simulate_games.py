@@ -52,6 +52,7 @@ class PrisonersDilemmaSimulation:
         }
         matches_played_by = {self.bot1.name: 0}
 
+        # Run matches
         for opponent_path in opponent_paths:
             self.bot2 = self.load_bot(opponent_path)
             self.history1 = []
@@ -70,7 +71,10 @@ class PrisonersDilemmaSimulation:
             matches_played_by[self.bot1.name] += 1
             matches_played_by[opponent_name] = matches_played_by.get(opponent_name, 0) + 1
 
-        self._write_summary("games", games_dir, all_scores, all_stats, matches_played_by, rounds)
+        # Only write summary if there are multiple opponents
+        if len(opponent_paths) > 1:
+            self._write_summary("games", games_dir, all_scores, all_stats, matches_played_by, rounds)
+        
         print(f"Games complete. Results saved to {games_dir}")
 
     def _run_match(self, rounds, tournament_dir, opponent_name):
@@ -175,3 +179,7 @@ class PrisonersDilemmaSimulation:
             self._write_tournament_summary(directory, scores, stats, matches_played_by, rounds_per_match)
         else:
             self._write_games_summary(directory, scores, stats, matches_played_by, rounds_per_match)
+
+    def _write_tournament_summary(self, directory, scores, stats, matches_played_by, rounds_per_match):
+        summary_path = os.path.join(directory, "Tournament_summary.txt")  # Capitalize to match the file pattern we look for
+        # ...existing code...
