@@ -114,6 +114,9 @@ class GameScreen:
             btn.bind('<Leave>', lambda e, b=btn: b.configure(bg=Style.COLORS['button']))
 
     def start_game(self):
+        # Clear the log before starting new game
+        self.game_ui.log_text.delete(1.0, tk.END)
+        self.game_ui.log_text.update_idletasks()
         self.game_ui.start_games()  # Now using the stored instance
 
     def back_to_menu(self):

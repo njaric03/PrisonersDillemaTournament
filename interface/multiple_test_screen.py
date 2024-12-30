@@ -94,7 +94,10 @@ class MultipleTestScreen:
             btn.bind('<Leave>', lambda e, b=btn: b.configure(bg=Style.COLORS['button']))
 
     def start_games(self):
-        self.game_ui.start_games()  # Now using the stored instance
+        # Clear the log before starting new games
+        self.game_ui.log_text.delete(1.0, tk.END)
+        self.game_ui.log_text.update_idletasks()
+        self.game_ui.start_games()
 
     def back_to_menu(self):
         from interface.menu_screen import MenuScreen  # Changed from relative to absolute import

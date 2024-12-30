@@ -105,7 +105,10 @@ class TournamentScreen:
             btn.bind('<Leave>', lambda e, b=btn: b.configure(bg=Style.COLORS['button']))
         
     def start_tournament(self):
-        self.game_ui.start_tournament()  # Now using the stored instance
+        # Clear the log before starting new tournament
+        self.game_ui.log_text.delete(1.0, tk.END)
+        self.game_ui.log_text.update_idletasks()
+        self.game_ui.start_tournament()
 
     def back_to_menu(self):
         for widget in self.root.winfo_children():
