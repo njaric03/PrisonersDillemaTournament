@@ -28,14 +28,12 @@ This Python-based tournament simulator brings the classic Prisoner's Dilemma to 
 - Performance metrics tracking
 - Strategy effectiveness analysis
 - Head-to-head comparison tools
-- Tournament history export
+- Tournament history logging and export
 
 ## Technologies
 
 - Python 3.8+
 - Tkinter (GUI Framework)
-- Object-Oriented Design
-- Strategy Pattern Implementation
 
 ## Getting Started
 
