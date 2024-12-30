@@ -71,4 +71,5 @@ The app comes with several built-in bots:
 - AlwaysBetrayBot: Always betrays.
 - TitForTatBot: Mirrors the opponent's last move.
 - RandomBot: Makes random decisions.
-- You can battle these or test your own bot against them.
+  
+You can battle these or test your own bot against them.
