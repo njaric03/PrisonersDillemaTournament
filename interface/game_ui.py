@@ -87,12 +87,20 @@ class GameUI:
         self.main_frame.grid_propagate(False)
         self.main_frame.configure(width=screen_width-100, height=screen_height-200)
 
+        # Get mode from window title
+        window_title = parent.winfo_toplevel().title()
+        self.mode = "game"  # default mode
+        if "Tournament" in window_title:
+            self.mode = "tournament"
+        elif "Multiple" in window_title:
+            self.mode = "multiple"
+        
+        # Initialize frames based on mode
         if self.mode == "tournament":
-            # Tournament mode - simplified layout with only log and participants
+            # Tournament mode - only center and right frames
             self.main_frame.grid_columnconfigure(0, weight=2)  # Log
             self.main_frame.grid_columnconfigure(1, weight=1)  # Participants
-
-            # Create and configure frames
+            
             self.center_frame = ttk.LabelFrame(self.main_frame, 
                                              text="Tournament Log", 
                                              padding="10",
@@ -104,153 +112,92 @@ class GameUI:
             
             self.center_frame.grid(row=0, column=0, sticky="nsew", pady=20, padx=10)
             self.right_frame.grid(row=0, column=1, sticky="nsew", pady=20, padx=10)
-            
+
             # Configure frame weights
             for frame in [self.center_frame, self.right_frame]:
                 frame.grid_rowconfigure(0, weight=3)
                 frame.grid_columnconfigure(0, weight=1)
 
-            # Add log text widget
+            # Setup widgets
             self.setup_log_widget()
-            
-            # Add participants listbox
-            self.setup_participants_listbox()
-
-        elif self.mode == "multiple":
-            # Multiple test mode - similar to tournament mode
-            self.main_frame.grid_columnconfigure(0, weight=2)  # Log
-            self.main_frame.grid_columnconfigure(1, weight=1)  # Participants
-
-            # Create and configure frames similarly to tournament mode
-            self.center_frame = ttk.LabelFrame(self.main_frame, 
-                                             text="Games Log", 
-                                             padding="10",
-                                             style='Custom.TLabelframe')
-            self.right_frame = ttk.LabelFrame(self.main_frame, 
-                                            text="Opponents", 
-                                            padding="10",
-                                             style='Custom.TLabelframe')
-            
-            self.center_frame.grid(row=0, column=0, sticky="nsew", pady=20, padx=10)
-            self.right_frame.grid(row=0, column=1, sticky="nsew", pady=20, padx=10)
-            
-            # Configure frame weights
-            for frame in [self.center_frame, self.right_frame]:
-                frame.grid_rowconfigure(0, weight=3)
-                frame.grid_columnconfigure(0, weight=1)
-
-            # Add log text widget
-            self.setup_log_widget()
-            
-            # Add participants listbox with same structure as tournament
             self.setup_participants_listbox()
 
         else:
-            # Regular mode - original three-column layout
-            # Configure all grid weights for vertical expansion
-            self.main_frame.grid_rowconfigure(0, weight=1)  # Main content row
-            self.main_frame.grid_columnconfigure(0, weight=1)  # Left frame
-            self.main_frame.grid_columnconfigure(1, weight=2)  # Center space
-            self.main_frame.grid_columnconfigure(2, weight=1)  # Right frame
-
-            # Left and right frames need vertical expansion
+            # Game or Multiple mode - three column layout
+            self.main_frame.grid_columnconfigure(0, weight=1)  # Left bot
+            self.main_frame.grid_columnconfigure(1, weight=2)  # Log
+            self.main_frame.grid_columnconfigure(2, weight=1)  # Right bot(s)
+            
             self.left_frame = ttk.LabelFrame(self.main_frame, 
-                                           text="Player 1", 
+                                           text="Your Bot", 
                                            padding="10",
                                            style='Custom.TLabelframe')
             self.center_frame = ttk.LabelFrame(self.main_frame, 
-                                             text="Simulation Log", 
+                                             text="Game Log", 
                                              padding="10",
                                              style='Custom.TLabelframe')
             self.right_frame = ttk.LabelFrame(self.main_frame, 
-                                            text="Player 2", 
+                                            text="Player 2" if self.mode == "game" else "Opponents", 
                                             padding="10",
                                             style='Custom.TLabelframe')
             
-            # Make frames expand vertically and give them more weight
-            self.left_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=20)
+            self.left_frame.grid(row=0, column=0, sticky="nsew", pady=20, padx=10)
             self.center_frame.grid(row=0, column=1, sticky="nsew", pady=20)
-            self.right_frame.grid(row=0, column=2, sticky="nsew", padx=10, pady=20)
+            self.right_frame.grid(row=0, column=2, sticky="nsew", pady=20, padx=10)
             
-            # Configure vertical expansion for frames with more weight
+            # Configure frame weights
             for frame in [self.left_frame, self.center_frame, self.right_frame]:
-                frame.grid_rowconfigure(0, weight=3)  # Increased weight
+                frame.grid_rowconfigure(0, weight=3)
                 frame.grid_columnconfigure(0, weight=1)
 
-            # Add log text widget in center frame with expanded height
-            self.log_text = tk.Text(self.center_frame, width=50, height=20, bg='#2a2a2a', fg='white',
-                                font=('Courier', 10))
-            log_scrollbar = ttk.Scrollbar(self.center_frame, orient="vertical", command=self.log_text.yview)
-            self.log_text.configure(yscrollcommand=log_scrollbar.set)
-            
-            self.log_text.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
-            log_scrollbar.grid(row=0, column=1, sticky="ns")
-
-            # Update text widget colors
-            self.log_text.configure(
-                bg=Style.COLORS['button'],
-                fg=Style.COLORS['text'],
-                font=Style.FONTS['text']
-            )
-
-            # Add info label under log widget
-            info_label = ttk.Label(self.center_frame,
-                                 text="Complete results will be saved in the logs subdirectory",
-                                 font=Style.FONTS['text'],
-                                 foreground=Style.COLORS['text'],
-                                 background=Style.COLORS['bg'])
-            info_label.grid(row=1, column=0, columnspan=2, sticky="ew", padx=5, pady=(0, 5))
-            
-            # Left frame content (Player 1)
-            select_label = ttk.Label(self.left_frame, 
-                                   text="Select Bot File:",
-                                   style='Custom.TLabel')
+            # Setup player 1 frame
+            select_label = ttk.Label(self.left_frame, text="Select Bot File:", style='Custom.TLabel')
             select_label.pack(pady=5)
             
             self.player1_path = tk.StringVar()
-            entry = ttk.Entry(self.left_frame, 
-                            textvariable=self.player1_path, 
-                            width=50)
+            entry = ttk.Entry(self.left_frame, textvariable=self.player1_path, width=50)
             entry.pack(pady=5)
             
-            browse_btn = tk.Button(self.left_frame, 
-                                 text="Browse",
-                                 command=self.browse_file,
-                                 **Style.button_style())
+            browse_btn = tk.Button(self.left_frame, text="Browse", command=self.browse_file, **Style.button_style())
             browse_btn.pack(pady=5)
             
             # Add hover effect
             browse_btn.bind('<Enter>', lambda e: browse_btn.configure(bg=Style.COLORS['button_hover']))
             browse_btn.bind('<Leave>', lambda e: browse_btn.configure(bg=Style.COLORS['button']))
 
-            # Right frame content (Player 2)
-            available_label = ttk.Label(self.right_frame, 
-                                      text="Available Bots:",
-                                      style='Custom.TLabel')
-            available_label.pack(pady=5)
+            # Setup center frame (log)
+            self.setup_log_widget()
             
-            # Create listbox with scrollbar
+            # Setup right frame (opponents)
             listbox_frame = ttk.Frame(self.right_frame)
             listbox_frame.pack(fill=tk.BOTH, expand=True)
             
-            self.bot_listbox = tk.Listbox(listbox_frame)
+            self.bot_listbox = tk.Listbox(listbox_frame,
+                                        selectmode=tk.SINGLE if self.mode == "game" else tk.MULTIPLE,
+                                        bg=Style.COLORS['button'],
+                                        fg=Style.COLORS['text'],
+                                        font=Style.FONTS['text'],
+                                        selectbackground=Style.COLORS['button_hover'],
+                                        selectforeground=Style.COLORS['text'])
+            
             scrollbar = ttk.Scrollbar(listbox_frame, orient="vertical", command=self.bot_listbox.yview)
             self.bot_listbox.configure(yscrollcommand=scrollbar.set)
+            
+            if self.mode == "multiple":
+                # Add Select All checkbox for multiple mode
+                self.select_all_var = tk.BooleanVar()
+                select_all_btn = ttk.Checkbutton(
+                    self.right_frame,
+                    text="Select All",
+                    variable=self.select_all_var,
+                    style='Custom.TCheckbutton',
+                    command=self.toggle_select_all)
+                select_all_btn.pack(pady=(5,0), anchor="w")
             
             self.bot_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
             scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
             
-            self.update_bot_dropdown()
-
-            # Update listbox colors
-            self.bot_listbox.configure(
-                bg=Style.COLORS['button'],
-                fg=Style.COLORS['text'],
-                font=Style.FONTS['text'],
-                selectbackground=Style.COLORS['button_hover'],
-                selectforeground=Style.COLORS['text']
-            )
-            
+            # Add custom bot button
             custom_btn = tk.Button(self.right_frame, 
                                  text="Add Custom Bot",
                                  command=self.add_custom_bot,
@@ -260,15 +207,44 @@ class GameUI:
             # Add hover effect
             custom_btn.bind('<Enter>', lambda e: custom_btn.configure(bg=Style.COLORS['button_hover']))
             custom_btn.bind('<Leave>', lambda e: custom_btn.configure(bg=Style.COLORS['button']))
-
-            # Create tooltip
-            self.tooltip = None
-            self.tooltip_id = None
-            self.current_item = -1
-
-            # Bind mouse events
+            
+            # Update bot list
+            self.update_bot_dropdown()
+            
+            # Bind tooltip events
             self.bot_listbox.bind('<Motion>', self.schedule_tooltip)
             self.bot_listbox.bind('<Leave>', self.schedule_hide_tooltip)
+
+    def create_player_frame(self, title):
+        # Helper method to create player frame with file selection
+        frame = ttk.LabelFrame(self.main_frame, text=title, padding="10", style='Custom.TLabelframe')
+        
+        select_label = ttk.Label(frame, text="Select Bot File:", style='Custom.TLabel')
+        select_label.pack(pady=5)
+        
+        self.player1_path = tk.StringVar()
+        entry = ttk.Entry(frame, textvariable=self.player1_path, width=50)
+        entry.pack(pady=5)
+        
+        browse_btn = tk.Button(frame, text="Browse", command=self.browse_file, **Style.button_style())
+        browse_btn.pack(pady=5)
+        
+        browse_btn.bind('<Enter>', lambda e: browse_btn.configure(bg=Style.COLORS['button_hover']))
+        browse_btn.bind('<Leave>', lambda e: browse_btn.configure(bg=Style.COLORS['button']))
+        
+        return frame
+
+    def create_log_frame(self, title):
+        # Helper method to create log frame
+        frame = ttk.LabelFrame(self.main_frame, text=title, padding="10", style='Custom.TLabelframe')
+        # ...rest of existing log frame creation code...
+        return frame
+
+    def create_bot_frame(self, title):
+        # Helper method to create bot selection frame
+        frame = ttk.LabelFrame(self.main_frame, text=title, padding="10", style='Custom.TLabelframe')
+        # ...rest of existing bot frame creation code...
+        return frame
 
     def setup_log_widget(self):
         # Update log widget with style

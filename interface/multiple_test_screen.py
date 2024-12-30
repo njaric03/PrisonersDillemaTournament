@@ -62,10 +62,9 @@ class MultipleTestScreen:
                               wraplength=800)
         description.grid(row=2, column=0, pady=(0, 20))
         
-        # Create the game UI
+        # Create the game UI with three-column layout
         self.game_ui = GameUI(self.main_frame)
         self.game_ui.main_frame.grid(row=3, column=0, sticky="nsew")
-        self.game_ui.bot_listbox.configure(selectmode=tk.MULTIPLE)
         
         # Create bottom button frame (in row 4)
         button_frame = tk.Frame(self.main_frame, bg=Style.COLORS['bg'])
