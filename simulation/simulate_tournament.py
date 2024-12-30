@@ -1,79 +1,137 @@
 from datetime import datetime
 import os
-from .simulate_games import PrisonersDilemmaSimulation
+from utils.abstract_bot import AbstractBot
 from utils.moves import Move
+import importlib.util
 
-class TournamentSimulation(PrisonersDilemmaSimulation):
-    def __init__(self, bot1_path):  # Add bot1_path parameter
-        super().__init__(bot1_path)  # Pass bot1_path to parent
+class TournamentSimulation:
+    def __init__(self):
         self.logs_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'logs')
         os.makedirs(self.logs_dir, exist_ok=True)
 
+    def load_bot(self, bot_path):
+        """Load a bot from a file path."""
+        try:
+            spec = importlib.util.spec_from_file_location("bot_module", bot_path)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            
+            for item in dir(module):
+                obj = getattr(module, item)
+                if isinstance(obj, type) and issubclass(obj, AbstractBot) and obj != AbstractBot:
+                    return obj()
+            raise ValueError("No valid bot class found in file")
+        except Exception as e:
+            raise Exception(f"Failed to load bot: {str(e)}")
+
     def run_all_against_all(self, bot_paths, rounds=100):
-        """
-        Conduct a round-robin where each bot plays against each other.
-        """
+        """Conduct a round-robin tournament where each bot plays against each other."""
         timestamp = datetime.now().strftime("%H%M")
         tournament_dir = os.path.join(self.logs_dir, f"{timestamp}_tournament")
         os.makedirs(tournament_dir)
 
-        # Create subdirectories for logs
-        player_dir = os.path.join(tournament_dir, "player_games")
-        others_dir = os.path.join(tournament_dir, "other_games")
-        os.makedirs(player_dir)
-        os.makedirs(others_dir)
-
         # Track scores and statistics
         scores = {}
-        matches_played_by = {}
-        all_stats = {
+        matches_played = {}
+        stats = {
             'mutual_cooperation': 0,
             'mutual_defection': 0,
-            'bot1_betrayals': 0,
-            'opponent_betrayals': 0
+            'betrayals': {}  # Will track betrayals per bot
         }
 
-        # Store the player's bot name for comparison
-        player_bot_name = self.bot1.name
-        
         # Run matches between all pairs of bots
         for i, bot1_path in enumerate(bot_paths):
             bot1 = self.load_bot(bot1_path)
-            for bot2_path in bot_paths[i+1:]:  # Start from i+1 to avoid duplicate matches
+            stats['betrayals'][bot1.name] = 0
+            
+            for j, bot2_path in enumerate(bot_paths[i+1:], i+1):
                 bot2 = self.load_bot(bot2_path)
+                if j == i: continue  # Skip self-play
                 
-                # Initialize scores if needed
-                scores.setdefault(bot1.name, 0)
-                scores.setdefault(bot2.name, 0)
-                matches_played_by.setdefault(bot1.name, 0)
-                matches_played_by.setdefault(bot2.name, 0)
+                if bot2.name not in stats['betrayals']:
+                    stats['betrayals'][bot2.name] = 0
 
-                # Determine log directory by comparing with player's bot name
-                is_player_game = (bot1.name == player_bot_name or bot2.name == player_bot_name)
-                log_dir = player_dir if is_player_game else others_dir
+                # Initialize scores if needed
+                for bot_name in [bot1.name, bot2.name]:
+                    scores.setdefault(bot_name, 0)
+                    matches_played.setdefault(bot_name, 0)
 
                 # Run match
-                self.bot1 = bot1
-                self.bot2 = bot2
-                self.history1 = []
-                self.history2 = []
-                self.scores = {bot1.name: 0, bot2.name: 0}
-
-                stats = self._run_match(rounds, log_dir, bot2.name)
-
+                match_stats = self._run_match(bot1, bot2, rounds, tournament_dir)
+                
                 # Update scores and statistics
-                scores[bot1.name] += self.scores[bot1.name]
-                scores[bot2.name] += self.scores[bot2.name]
-                matches_played_by[bot1.name] += 1
-                matches_played_by[bot2.name] += 1
+                scores[bot1.name] += match_stats['scores'][bot1.name]
+                scores[bot2.name] += match_stats['scores'][bot2.name]
+                matches_played[bot1.name] += 1
+                matches_played[bot2.name] += 1
+                
+                stats['mutual_cooperation'] += match_stats['mutual_cooperation']
+                stats['mutual_defection'] += match_stats['mutual_defection']
+                stats['betrayals'][bot1.name] += match_stats['betrayals'][bot1.name]
+                stats['betrayals'][bot2.name] += match_stats['betrayals'][bot2.name]
 
-                for key in all_stats:
-                    all_stats[key] += stats[key]
+        self._write_tournament_summary(tournament_dir, scores, stats, matches_played, rounds)
+        return tournament_dir
 
-        self._write_tournament_summary(tournament_dir, scores, all_stats, matches_played_by, rounds)
-        print(f"Tournament complete. Results saved to {tournament_dir}")
+    def _run_match(self, bot1, bot2, rounds, tournament_dir):
+        """Run a single match between two bots and return match statistics."""
+        scores = {bot1.name: 0, bot2.name: 0}
+        stats = {
+            'mutual_cooperation': 0,
+            'mutual_defection': 0,
+            'betrayals': {bot1.name: 0, bot2.name: 0}
+        }
+        
+        # Reset bot histories at start of match
+        bot1.my_history = []
+        bot1.opponent_history = []
+        bot2.my_history = []
+        bot2.opponent_history = []
+        
+        # Play rounds
+        for _ in range(rounds):
+            # Get moves using proper AbstractBot interface
+            move1 = bot1.make_decision()
+            move2 = bot2.make_decision()
+            
+            # Update both bots' history
+            bot1.update_history(move1, move2)
+            bot2.update_history(move2, move1)
+            
+            # Update scores and stats
+            if move1 == Move.COOPERATE and move2 == Move.COOPERATE:
+                scores[bot1.name] += 3
+                scores[bot2.name] += 3
+                stats['mutual_cooperation'] += 1
+            elif move1 == Move.COOPERATE and move2 == Move.DEFECT:
+                scores[bot2.name] += 5
+                stats['betrayals'][bot2.name] += 1
+            elif move1 == Move.DEFECT and move2 == Move.COOPERATE:
+                scores[bot1.name] += 5
+                stats['betrayals'][bot1.name] += 1
+            else:  # Both defect
+                scores[bot1.name] += 1
+                scores[bot2.name] += 1
+                stats['mutual_defection'] += 1
+        
+        # Write match results to file
+        match_file = os.path.join(tournament_dir, f"{bot1.name}_vs_{bot2.name}.txt")
+        with open(match_file, 'w') as f:
+            f.write(f"Match: {bot1.name} vs {bot2.name}\n")
+            f.write(f"Scores: {bot1.name}: {scores[bot1.name]}, {bot2.name}: {scores[bot2.name]}\n")
+            f.write(f"Mutual Cooperation: {stats['mutual_cooperation']}\n")
+            f.write(f"Mutual Defection: {stats['mutual_defection']}\n")
+            f.write(f"Betrayals by {bot1.name}: {stats['betrayals'][bot1.name]}\n")
+            f.write(f"Betrayals by {bot2.name}: {stats['betrayals'][bot2.name]}\n")
+        
+        return {
+            'scores': scores,
+            'mutual_cooperation': stats['mutual_cooperation'],
+            'mutual_defection': stats['mutual_defection'],
+            'betrayals': stats['betrayals']
+        }
 
-    def _write_tournament_summary(self, directory, scores, stats, matches_played_by, rounds_per_match):
+    def _write_tournament_summary(self, directory, scores, stats, matches_played, rounds_per_match):
         summary_path = os.path.join(directory, "tournament_summary.txt")
         with open(summary_path, 'w') as f:
             f.write("="*50 + "\n")
@@ -85,16 +143,15 @@ class TournamentSimulation(PrisonersDilemmaSimulation):
             f.write("-"*50 + "\n")
             sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
             for bot, score in sorted_scores:
-                avg_score = score / matches_played_by[bot]
+                avg_score = score / matches_played[bot]
                 f.write(f"{bot}: {score} (avg per match: {avg_score:.1f})\n")
 
             # Aggregate statistics
-            total_matches = sum(matches_played_by.values()) // 2
+            total_matches = sum(matches_played.values()) // 2
             f.write("\n\nAGGREGATE STATISTICS\n")
             f.write("-"*50 + "\n")
             f.write(f"Total Matches: {total_matches}\n")
             f.write(f"Average Mutual Cooperation: {stats['mutual_cooperation']/total_matches:.1f} per match\n")
             f.write(f"Average Mutual Defection: {stats['mutual_defection']/total_matches:.1f} per match\n")
-            f.write(f"Average Bot Betrayals: {stats['bot1_betrayals']/total_matches:.1f} per match\n")
-            f.write(f"Average Opponent Betrayals: {stats['opponent_betrayals']/total_matches:.1f} per match\n")
+            f.write(f"Average Bot Betrayals: {sum(stats['betrayals'].values())/total_matches:.1f} per match\n")
 

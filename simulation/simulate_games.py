@@ -38,55 +38,39 @@ class PrisonersDilemmaSimulation:
         else:  # both defect
             return 1, 1
 
-    def run_games(self, opponent_paths, rounds=10):
+    def run_games(self, opponent_paths, rounds=100):
+        """Run games against multiple opponents."""
         timestamp = datetime.now().strftime("%H%M")
         games_dir = os.path.join(self.logs_dir, f"{timestamp}_{self.bot1.name}_games")
         os.makedirs(games_dir)
 
-        all_scores = {self.bot1.name: 0}
-        all_stats = {
-            'mutual_cooperation': 0,
-            'mutual_defection': 0,
-            'bot1_betrayals': 0,
-            'opponent_betrayals': 0
-        }
-        matches_played_by = {self.bot1.name: 0}
-
-        # Run matches
+        all_stats = []
         for opponent_path in opponent_paths:
-            self.bot2 = self.load_bot(opponent_path)
-            self.history1 = []
-            self.history2 = []
+            # Load opponent bot
+            opponent = self.load_bot(opponent_path)
+            
+            # Run the match and collect stats
+            match_stats = self._run_match(opponent, rounds, games_dir)
+            all_stats.append({
+                'opponent': opponent.name,
+                'stats': match_stats
+            })
 
-            opponent_name = f"{self.bot2.name} (copy)" if self.bot2.name == self.bot1.name else self.bot2.name
-            self.scores = {self.bot1.name: 0, opponent_name: 0}
-
-            stats = self._run_match(rounds, games_dir, opponent_name)
-
-            all_scores[self.bot1.name] += self.scores[self.bot1.name]
-            all_scores[opponent_name] = all_scores.get(opponent_name, 0) + self.scores[opponent_name]
-
-            for key in all_stats:
-                all_stats[key] += stats[key]
-            matches_played_by[self.bot1.name] += 1
-            matches_played_by[opponent_name] = matches_played_by.get(opponent_name, 0) + 1
-
-        # Only write summary if there are multiple opponents
-        if len(opponent_paths) > 1:
-            self._write_summary("games", games_dir, all_scores, all_stats, matches_played_by, rounds)
-        
+        # Write summary of all games
+        self._write_games_summary(games_dir, all_stats)
         print(f"Games complete. Results saved to {games_dir}")
 
-    def _run_match(self, rounds, tournament_dir, opponent_name):
+    def _run_match(self, opponent, rounds, tournament_dir):
         stats = {
             'mutual_cooperation': 0,
             'mutual_defection': 0,
             'bot1_betrayals': 0,
-            'opponent_betrayals': 0
+            'opponent_betrayals': 0,
+            'scores': {self.bot1.name: 0, opponent.name: 0}
         }
 
         timestamp = datetime.now().strftime("%H%M")
-        log_filename = f"{timestamp}_vs_{self.bot2.name}.txt"
+        log_filename = f"{timestamp}_vs_{opponent.name}.txt"
         log_path = os.path.join(tournament_dir, log_filename)
 
         output_lines = []
@@ -94,7 +78,7 @@ class PrisonersDilemmaSimulation:
             "="*50,
             f"MATCH RESULTS - {datetime.now().strftime('%Y-%m-%d %H:%M')}",
             f"Bot 1: {self.bot1.name}",
-            f"Bot 2: {opponent_name}",
+            f"Bot 2: {opponent.name}",
             "="*50,
             ""
         ])
@@ -106,15 +90,12 @@ class PrisonersDilemmaSimulation:
         ])
 
         for round_num in range(rounds):
-            move1 = self.bot1.strategy(self.history2.copy())
-            move2 = self.bot2.strategy(self.history1.copy())
-
-            self.history1.append(move1)
-            self.history2.append(move2)
+            move1 = self.bot1.strategy([])
+            move2 = opponent.strategy([])
 
             score1, score2 = self.calculate_score(move1, move2)
-            self.scores[self.bot1.name] += score1
-            self.scores[opponent_name] += score2
+            stats['scores'][self.bot1.name] += score1
+            stats['scores'][opponent.name] += score2
 
             if move1 == Move.COOPERATE and move2 == Move.COOPERATE:
                 stats['mutual_cooperation'] += 1
@@ -130,8 +111,8 @@ class PrisonersDilemmaSimulation:
         scores_section = [
             "SCORES:",
             "-"*50,
-            f"{self.bot1.name}: {self.scores[self.bot1.name]}",
-            f"{opponent_name}: {self.scores[opponent_name]}",
+            f"{self.bot1.name}: {stats['scores'][self.bot1.name]}",
+            f"{opponent.name}: {stats['scores'][opponent.name]}",
             "-"*50,
             ""
         ]
@@ -148,8 +129,8 @@ class PrisonersDilemmaSimulation:
             "",
             "FINAL SCORES:",
             "-"*50,
-            f"{self.bot1.name}: {self.scores[self.bot1.name]}",
-            f"{opponent_name}: {self.scores[opponent_name]}",
+            f"{self.bot1.name}: {stats['scores'][self.bot1.name]}",
+            f"{opponent.name}: {stats['scores'][opponent.name]}",
             "="*50
         ])
 
@@ -158,28 +139,32 @@ class PrisonersDilemmaSimulation:
 
         return stats
 
-    def _write_games_summary(self, directory, scores, stats, matches_played_by, rounds_per_match):
+    def _write_games_summary(self, directory, all_stats):
+        """Write a summary of all games played."""
         summary_path = os.path.join(directory, "games_summary.txt")
         with open(summary_path, 'w') as f:
             f.write("="*50 + "\n")
-            f.write("GAMES SUMMARY\n")
+            f.write(f"MULTIPLE GAMES SUMMARY\n")
+            f.write(f"Player: {self.bot1.name}\n")
             f.write("="*50 + "\n\n")
 
-            f.write("FINAL RESULTS PER BOT\n")
-            f.write("-"*50 + "\n")
-            for bot, score in scores.items():
-                if bot == self.bot1.name:
-                    avg_points_per_match = score / matches_played_by[bot]
-                    f.write(f"{bot}: {score} (avg points per match: {avg_points_per_match:.2f})\n")
-                else:
-                    f.write(f"{bot}: {score}\n")
+            for stat in all_stats:
+                opponent = stat['opponent']
+                stats = stat['stats']
+                f.write(f"Against {opponent}:\n")
+                f.write("-"*30 + "\n")
+                f.write(f"Score: {stats['scores'][self.bot1.name]}\n")
+                f.write(f"Mutual Cooperation: {stats['mutual_cooperation']}\n")
+                f.write(f"Mutual Defection: {stats['mutual_defection']}\n")
+                f.write(f"Times Betrayed: {stats['opponent_betrayals']}\n")
+                f.write(f"Times Betrayed Opponent: {stats['bot1_betrayals']}\n\n")
 
-    def _write_summary(self, mode, directory, scores, stats, matches_played_by, rounds_per_match):
-        if mode == "tournament":
-            self._write_tournament_summary(directory, scores, stats, matches_played_by, rounds_per_match)
-        else:
-            self._write_games_summary(directory, scores, stats, matches_played_by, rounds_per_match)
-
-    def _write_tournament_summary(self, directory, scores, stats, matches_played_by, rounds_per_match):
-        summary_path = os.path.join(directory, "Tournament_summary.txt")  # Capitalize to match the file pattern we look for
-        # ...existing code...
+            # Overall statistics
+            f.write("\nOVERALL STATISTICS\n")
+            f.write("-"*30 + "\n")
+            total_games = len(all_stats)
+            total_score = sum(s['stats']['scores'][self.bot1.name] for s in all_stats)
+            avg_score = total_score / total_games
+            f.write(f"Total Games: {total_games}\n")
+            f.write(f"Total Score: {total_score}\n")
+            f.write(f"Average Score: {avg_score:.1f}\n")

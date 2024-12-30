@@ -59,15 +59,15 @@ class TournamentScreen:
                               wraplength=800)
         description.grid(row=2, column=0, pady=(0, 20))
         
-        # Create the game UI with checkbox listbox
-        self.game_ui = GameUI(self.main_frame, use_checkboxes=True)
+        # Create the game UI without checkbox parameter
+        self.game_ui = GameUI(self.main_frame)
         self.game_ui.main_frame.grid(row=3, column=0, sticky="nsew")
         self.game_ui.bot_listbox.configure(selectmode=tk.MULTIPLE)
         
         # Add select all button to the game UI's right frame above listbox
         self.select_all_var = tk.BooleanVar()
         self.select_all_btn = ttk.Checkbutton(
-            self.game_ui.right_frame,  # Changed back to right_frame
+            self.game_ui.right_frame,
             text="Select All",
             variable=self.select_all_var,
             command=self.toggle_select_all)

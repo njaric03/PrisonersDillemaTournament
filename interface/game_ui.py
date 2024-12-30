@@ -7,7 +7,12 @@ from simulation.simulate_tournament import TournamentSimulation
 from simulation.simulate_games import PrisonersDilemmaSimulation
 
 class GameUI:
-    def __init__(self, parent, use_checkboxes=False):
+    def __init__(self, parent):
+        # Initialize tooltip-related attributes at the start
+        self.tooltip = None
+        self.tooltip_id = None
+        self.current_item = -1
+        
         # Add mode detection based on window title
         self.mode = "game"  # default mode
         if parent.winfo_toplevel().title() == "Tournament Mode":
@@ -16,7 +21,6 @@ class GameUI:
             self.mode = "multiple"
             
         self.parent = parent
-        self.use_checkboxes = use_checkboxes
         
         # Get screen dimensions
         screen_width = parent.winfo_screenwidth()
@@ -44,35 +48,102 @@ class GameUI:
         style.configure('TRadiobutton', background='#1a1a1a', foreground='white')
         
         # Create main frame with padding and explicit minimum size
-        self.main_frame = ttk.Frame(parent, padding="20", style='TFrame')  # Made it instance variable
-        self.main_frame.grid(row=1, column=0, sticky="nsew")  # Changed row from 0 to 1
-        
-        # Ensure minimum size for main frame
+        self.main_frame = ttk.Frame(parent, padding="20", style='TFrame')
+        self.main_frame.grid(row=1, column=0, sticky="nsew")
+
+        # Configure main frame size
         self.main_frame.grid_propagate(False)
         self.main_frame.configure(width=screen_width-100, height=screen_height-200)
-        
-        # Configure all grid weights for vertical expansion
-        self.main_frame.grid_rowconfigure(0, weight=1)  # Main content row
-        self.main_frame.grid_columnconfigure(0, weight=1)  # Left frame
-        self.main_frame.grid_columnconfigure(1, weight=2)  # Center space
-        self.main_frame.grid_columnconfigure(2, weight=1)  # Right frame
 
-        # Left and right frames need vertical expansion
-        self.left_frame = ttk.LabelFrame(self.main_frame, text="Player 1", padding="10")
-        self.center_frame = ttk.LabelFrame(self.main_frame, text="Simulation Log", padding="10")
-        self.right_frame = ttk.LabelFrame(self.main_frame, text="Player 2", padding="10")
-        
-        # Make frames expand vertically and give them more weight
-        self.left_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=20)
-        self.center_frame.grid(row=0, column=1, sticky="nsew", pady=20)
-        self.right_frame.grid(row=0, column=2, sticky="nsew", padx=10, pady=20)
-        
-        # Configure vertical expansion for frames with more weight
-        for frame in [self.left_frame, self.center_frame, self.right_frame]:
-            frame.grid_rowconfigure(0, weight=3)  # Increased weight
-            frame.grid_columnconfigure(0, weight=1)
+        if self.mode == "tournament":
+            # Tournament mode - simplified layout with only log and participants
+            self.main_frame.grid_columnconfigure(0, weight=2)  # Log
+            self.main_frame.grid_columnconfigure(1, weight=1)  # Participants
 
-        # Add log text widget in center frame with expanded height
+            # Create and configure frames
+            self.center_frame = ttk.LabelFrame(self.main_frame, text="Tournament Log", padding="10")
+            self.right_frame = ttk.LabelFrame(self.main_frame, text="Participants", padding="10")
+            
+            self.center_frame.grid(row=0, column=0, sticky="nsew", pady=20, padx=10)
+            self.right_frame.grid(row=0, column=1, sticky="nsew", pady=20, padx=10)
+            
+            # Configure frame weights
+            for frame in [self.center_frame, self.right_frame]:
+                frame.grid_rowconfigure(0, weight=3)
+                frame.grid_columnconfigure(0, weight=1)
+
+            # Add log text widget
+            self.setup_log_widget()
+            
+            # Add participants listbox
+            self.setup_participants_listbox()
+
+        else:
+            # Regular mode - original three-column layout
+            # Configure all grid weights for vertical expansion
+            self.main_frame.grid_rowconfigure(0, weight=1)  # Main content row
+            self.main_frame.grid_columnconfigure(0, weight=1)  # Left frame
+            self.main_frame.grid_columnconfigure(1, weight=2)  # Center space
+            self.main_frame.grid_columnconfigure(2, weight=1)  # Right frame
+
+            # Left and right frames need vertical expansion
+            self.left_frame = ttk.LabelFrame(self.main_frame, text="Player 1", padding="10")
+            self.center_frame = ttk.LabelFrame(self.main_frame, text="Simulation Log", padding="10")
+            self.right_frame = ttk.LabelFrame(self.main_frame, text="Player 2", padding="10")
+            
+            # Make frames expand vertically and give them more weight
+            self.left_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=20)
+            self.center_frame.grid(row=0, column=1, sticky="nsew", pady=20)
+            self.right_frame.grid(row=0, column=2, sticky="nsew", padx=10, pady=20)
+            
+            # Configure vertical expansion for frames with more weight
+            for frame in [self.left_frame, self.center_frame, self.right_frame]:
+                frame.grid_rowconfigure(0, weight=3)  # Increased weight
+                frame.grid_columnconfigure(0, weight=1)
+
+            # Add log text widget in center frame with expanded height
+            self.log_text = tk.Text(self.center_frame, width=50, height=20, bg='#2a2a2a', fg='white',
+                                font=('Courier', 10))
+            log_scrollbar = ttk.Scrollbar(self.center_frame, orient="vertical", command=self.log_text.yview)
+            self.log_text.configure(yscrollcommand=log_scrollbar.set)
+            
+            self.log_text.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+            log_scrollbar.grid(row=0, column=1, sticky="ns")
+            
+            # Left frame content (Player 1)
+            ttk.Label(self.left_frame, text="Select Bot File:").pack(pady=5)
+            self.player1_path = tk.StringVar()
+            ttk.Entry(self.left_frame, textvariable=self.player1_path, width=50).pack(pady=5)
+            ttk.Button(self.left_frame, text="Browse", command=self.browse_file).pack(pady=5)
+
+            # Right frame content (Player 2)
+            ttk.Label(self.right_frame, text="Available Bots:").pack(pady=5)
+            
+            # Create listbox with scrollbar
+            listbox_frame = ttk.Frame(self.right_frame)
+            listbox_frame.pack(fill=tk.BOTH, expand=True)
+            
+            self.bot_listbox = tk.Listbox(listbox_frame)
+            scrollbar = ttk.Scrollbar(listbox_frame, orient="vertical", command=self.bot_listbox.yview)
+            self.bot_listbox.configure(yscrollcommand=scrollbar.set)
+            
+            self.bot_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+            scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+            
+            self.update_bot_dropdown()
+            
+            ttk.Button(self.right_frame, text="Add Custom Bot", command=self.add_custom_bot).pack(pady=5)
+
+            # Create tooltip
+            self.tooltip = None
+            self.tooltip_id = None
+            self.current_item = -1
+
+            # Bind mouse events
+            self.bot_listbox.bind('<Motion>', self.schedule_tooltip)
+            self.bot_listbox.bind('<Leave>', self.schedule_hide_tooltip)
+
+    def setup_log_widget(self):
         self.log_text = tk.Text(self.center_frame, width=50, height=20, bg='#2a2a2a', fg='white',
                                font=('Courier', 10))
         log_scrollbar = ttk.Scrollbar(self.center_frame, orient="vertical", command=self.log_text.yview)
@@ -80,21 +151,13 @@ class GameUI:
         
         self.log_text.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
         log_scrollbar.grid(row=0, column=1, sticky="ns")
-        
-        # Left frame content (Player 1)
-        ttk.Label(self.left_frame, text="Select Bot File:").pack(pady=5)
-        self.player1_path = tk.StringVar()
-        ttk.Entry(self.left_frame, textvariable=self.player1_path, width=50).pack(pady=5)
-        ttk.Button(self.left_frame, text="Browse", command=self.browse_file).pack(pady=5)
 
-        # Right frame content (Player 2)
-        ttk.Label(self.right_frame, text="Available Bots:").pack(pady=5)
+    def setup_participants_listbox(self):
         
-        # Create listbox with scrollbar
         listbox_frame = ttk.Frame(self.right_frame)
         listbox_frame.pack(fill=tk.BOTH, expand=True)
         
-        self.bot_listbox = tk.Listbox(listbox_frame)
+        self.bot_listbox = tk.Listbox(listbox_frame, selectmode=tk.MULTIPLE)
         scrollbar = ttk.Scrollbar(listbox_frame, orient="vertical", command=self.bot_listbox.yview)
         self.bot_listbox.configure(yscrollcommand=scrollbar.set)
         
@@ -105,12 +168,7 @@ class GameUI:
         
         ttk.Button(self.right_frame, text="Add Custom Bot", command=self.add_custom_bot).pack(pady=5)
 
-        # Create tooltip
-        self.tooltip = None
-        self.tooltip_id = None
-        self.current_item = -1
-
-        # Bind mouse events
+        # Bind tooltip events
         self.bot_listbox.bind('<Motion>', self.schedule_tooltip)
         self.bot_listbox.bind('<Leave>', self.schedule_hide_tooltip)
 
@@ -351,14 +409,15 @@ class GameUI:
         try:
             simulation = PrisonersDilemmaSimulation(player1_bot)
             if self.mode == "game":
-                # For single game mode, only use first selected opponent
                 simulation.run_games([opponents[0]], 100)
-                # Look for the specific game log
                 self.update_log(self.read_latest_log("game"))
             else:
                 # For multiple test mode
                 simulation.run_games(opponents, 100)
+                # Force a small delay to ensure file is written
+                self.parent.after(100)  
                 self.update_log(self.read_latest_log("games_summary"))
+                self.center_frame.update_idletasks()  # Force UI update
                     
         except Exception as e:
             tk.messagebox.showerror("Error", f"Simulation failed: {str(e)}")
@@ -379,61 +438,20 @@ class GameUI:
             raise Exception(f"Failed to load bot: {str(e)}")
 
     def start_tournament(self):
-        """Round-robin tournament, results in Tournament_summary.txt."""
-        player1_bot = self.player1_path.get()
-        if not player1_bot:
-            tk.messagebox.showerror("Error", "Please select Player bot")
+        """Start a tournament with selected participants."""
+        selected_bots = self.get_selected_bots()
+        if len(selected_bots) < 2:
+            tk.messagebox.showerror("Error", "Please select at least 2 participants")
             return
 
         try:
-            # Load player's bot to get its name
-            player_bot = self.load_bot(player1_bot)
-            player_bot_name = player_bot.name
-
-            # Get selected opponents
-            selected_bots = self.get_selected_bots()
-            if not selected_bots:
-                tk.messagebox.showerror("Error", "Please select at least one opponent")
-                return
-
-            # Check if player's bot is among opponents
-            for opponent_path in selected_bots:
-                opponent_bot = self.load_bot(opponent_path)
-                if opponent_bot.name == player_bot_name:
-                    tk.messagebox.showerror("Error", "Player's bot cannot be selected as an opponent")
-                    return
-
-            # Create tournament simulator with player1's bot path
-            simulator = TournamentSimulation(player1_bot)
-            bot_paths = [player1_bot]
-            bot_paths.extend(selected_bots)
+            # Create tournament simulator and run tournament
+            simulator = TournamentSimulation()
+            tournament_dir = simulator.run_all_against_all(selected_bots)
             
-            # Run the tournament with all bots
-            simulator.run_all_against_all(bot_paths)
-            
-            # Update the log with tournament results
+            # Force update the log with tournament results
             self.update_log(self.read_latest_log("tournament"))
+            self.center_frame.update_idletasks()  # Force UI update
+            
         except Exception as e:
             tk.messagebox.showerror("Error", f"Tournament failed: {str(e)}")
-
-    def populate_bot_list(self):
-        self.bot_listbox.delete(0, tk.END)
-        for bot in self.available_bots:
-            if self.use_checkboxes:
-                self.bot_listbox.insert(tk.END, f"☐ {bot}")
-            else:
-                self.bot_listbox.insert(tk.END, bot)
-
-    def on_select(self, event):
-        if not self.use_checkboxes:
-            return
-            
-        selection = self.bot_listbox.curselection()
-        for index in selection:
-            current = self.bot_listbox.get(index)
-            if current.startswith("������"):
-                self.bot_listbox.delete(index)
-                self.bot_listbox.insert(index, f"☑ {current[2:]}")
-            else:
-                self.bot_listbox.delete(index)
-                self.bot_listbox.insert(index, f"☐ {current[2:]}")

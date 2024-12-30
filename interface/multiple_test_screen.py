@@ -62,8 +62,8 @@ class MultipleTestScreen:
                               wraplength=800)
         description.grid(row=2, column=0, pady=(0, 20))
         
-        # Create the game UI with checkbox listbox
-        self.game_ui = GameUI(self.main_frame, use_checkboxes=True)
+        # Create the game UI (removed use_checkboxes parameter)
+        self.game_ui = GameUI(self.main_frame)
         self.game_ui.main_frame.grid(row=3, column=0, sticky="nsew")
         self.game_ui.bot_listbox.configure(selectmode=tk.MULTIPLE)
         
