@@ -5,6 +5,7 @@ import importlib.util
 from utils.abstract_bot import AbstractBot
 from simulation.simulate_tournament import TournamentSimulation
 from simulation.simulate_games import PrisonersDilemmaSimulation
+from .shared_style import Style
 
 class GameUI:
     def __init__(self, parent):
@@ -47,8 +48,39 @@ class GameUI:
         style.configure('TLabel', background='#1a1a1a', foreground='white')
         style.configure('TRadiobutton', background='#1a1a1a', foreground='white')
         
-        # Create main frame with padding and explicit minimum size
-        self.main_frame = ttk.Frame(parent, padding="20", style='TFrame')
+        # Add style for checkbuttons
+        style.configure('Custom.TCheckbutton',
+                      background=Style.COLORS['bg'],
+                      foreground=Style.COLORS['text'])
+        
+        # Update style configurations
+        style = ttk.Style()
+        # Main container frame - invisible border
+        style.configure('Container.TFrame', 
+                       background=Style.COLORS['bg'],
+                       borderwidth=0)  # No border for main container
+        
+        # Content frame - visible white border
+        style.configure('Custom.TFrame', 
+                       background=Style.COLORS['bg'],
+                       borderwidth=1,
+                       relief='solid',
+                       bordercolor=Style.COLORS['text'])  # White border
+        
+        # Inner frames - white border
+        style.configure('Custom.TLabelframe', 
+                       background=Style.COLORS['bg'],
+                       foreground=Style.COLORS['text'],
+                       borderwidth=1,
+                       relief='solid',
+                       bordercolor=Style.COLORS['text'])  # White border
+        # Override the default background for all text labels
+        style.configure('TLabel',
+                       background=Style.COLORS['bg'],
+                       foreground=Style.COLORS['text'])
+        
+        # Create main frame without border
+        self.main_frame = ttk.Frame(parent, padding="20", style='Container.TFrame')
         self.main_frame.grid(row=1, column=0, sticky="nsew")
 
         # Configure main frame size
@@ -61,8 +93,14 @@ class GameUI:
             self.main_frame.grid_columnconfigure(1, weight=1)  # Participants
 
             # Create and configure frames
-            self.center_frame = ttk.LabelFrame(self.main_frame, text="Tournament Log", padding="10")
-            self.right_frame = ttk.LabelFrame(self.main_frame, text="Participants", padding="10")
+            self.center_frame = ttk.LabelFrame(self.main_frame, 
+                                             text="Tournament Log", 
+                                             padding="10",
+                                             style='Custom.TLabelframe')
+            self.right_frame = ttk.LabelFrame(self.main_frame, 
+                                            text="Participants", 
+                                            padding="10",
+                                            style='Custom.TLabelframe')
             
             self.center_frame.grid(row=0, column=0, sticky="nsew", pady=20, padx=10)
             self.right_frame.grid(row=0, column=1, sticky="nsew", pady=20, padx=10)
@@ -87,9 +125,18 @@ class GameUI:
             self.main_frame.grid_columnconfigure(2, weight=1)  # Right frame
 
             # Left and right frames need vertical expansion
-            self.left_frame = ttk.LabelFrame(self.main_frame, text="Player 1", padding="10")
-            self.center_frame = ttk.LabelFrame(self.main_frame, text="Simulation Log", padding="10")
-            self.right_frame = ttk.LabelFrame(self.main_frame, text="Player 2", padding="10")
+            self.left_frame = ttk.LabelFrame(self.main_frame, 
+                                           text="Player 1", 
+                                           padding="10",
+                                           style='Custom.TLabelframe')
+            self.center_frame = ttk.LabelFrame(self.main_frame, 
+                                             text="Simulation Log", 
+                                             padding="10",
+                                             style='Custom.TLabelframe')
+            self.right_frame = ttk.LabelFrame(self.main_frame, 
+                                            text="Player 2", 
+                                            padding="10",
+                                            style='Custom.TLabelframe')
             
             # Make frames expand vertically and give them more weight
             self.left_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=20)
@@ -109,15 +156,49 @@ class GameUI:
             
             self.log_text.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
             log_scrollbar.grid(row=0, column=1, sticky="ns")
+
+            # Update text widget colors
+            self.log_text.configure(
+                bg=Style.COLORS['button'],
+                fg=Style.COLORS['text'],
+                font=Style.FONTS['text']
+            )
+
+            # Add info label under log widget
+            info_label = ttk.Label(self.center_frame,
+                                 text="Complete results will be saved in the logs subdirectory",
+                                 font=Style.FONTS['text'],
+                                 foreground=Style.COLORS['text'],
+                                 background=Style.COLORS['bg'])
+            info_label.grid(row=1, column=0, columnspan=2, sticky="ew", padx=5, pady=(0, 5))
             
             # Left frame content (Player 1)
-            ttk.Label(self.left_frame, text="Select Bot File:").pack(pady=5)
+            select_label = ttk.Label(self.left_frame, 
+                                   text="Select Bot File:",
+                                   style='Custom.TLabel')
+            select_label.pack(pady=5)
+            
             self.player1_path = tk.StringVar()
-            ttk.Entry(self.left_frame, textvariable=self.player1_path, width=50).pack(pady=5)
-            ttk.Button(self.left_frame, text="Browse", command=self.browse_file).pack(pady=5)
+            entry = ttk.Entry(self.left_frame, 
+                            textvariable=self.player1_path, 
+                            width=50)
+            entry.pack(pady=5)
+            
+            browse_btn = tk.Button(self.left_frame, 
+                                 text="Browse",
+                                 command=self.browse_file,
+                                 **Style.button_style())
+            browse_btn.pack(pady=5)
+            
+            # Add hover effect
+            browse_btn.bind('<Enter>', lambda e: browse_btn.configure(bg=Style.COLORS['button_hover']))
+            browse_btn.bind('<Leave>', lambda e: browse_btn.configure(bg=Style.COLORS['button']))
 
             # Right frame content (Player 2)
-            ttk.Label(self.right_frame, text="Available Bots:").pack(pady=5)
+            available_label = ttk.Label(self.right_frame, 
+                                      text="Available Bots:",
+                                      style='Custom.TLabel')
+            available_label.pack(pady=5)
             
             # Create listbox with scrollbar
             listbox_frame = ttk.Frame(self.right_frame)
@@ -131,8 +212,25 @@ class GameUI:
             scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
             
             self.update_bot_dropdown()
+
+            # Update listbox colors
+            self.bot_listbox.configure(
+                bg=Style.COLORS['button'],
+                fg=Style.COLORS['text'],
+                font=Style.FONTS['text'],
+                selectbackground=Style.COLORS['button_hover'],
+                selectforeground=Style.COLORS['text']
+            )
             
-            ttk.Button(self.right_frame, text="Add Custom Bot", command=self.add_custom_bot).pack(pady=5)
+            custom_btn = tk.Button(self.right_frame, 
+                                 text="Add Custom Bot",
+                                 command=self.add_custom_bot,
+                                 **Style.button_style())
+            custom_btn.pack(pady=5)
+            
+            # Add hover effect
+            custom_btn.bind('<Enter>', lambda e: custom_btn.configure(bg=Style.COLORS['button_hover']))
+            custom_btn.bind('<Leave>', lambda e: custom_btn.configure(bg=Style.COLORS['button']))
 
             # Create tooltip
             self.tooltip = None
@@ -144,33 +242,85 @@ class GameUI:
             self.bot_listbox.bind('<Leave>', self.schedule_hide_tooltip)
 
     def setup_log_widget(self):
-        self.log_text = tk.Text(self.center_frame, width=50, height=20, bg='#2a2a2a', fg='white',
-                               font=('Courier', 10))
-        log_scrollbar = ttk.Scrollbar(self.center_frame, orient="vertical", command=self.log_text.yview)
+        # Update log widget with style
+        self.log_text = tk.Text(self.center_frame, 
+                               width=50, 
+                               height=20,
+                               bg=Style.COLORS['button'],
+                               fg=Style.COLORS['text'],
+                               font=Style.FONTS['text'])
+        log_scrollbar = ttk.Scrollbar(self.center_frame, 
+                                    orient="vertical",
+                                    command=self.log_text.yview)
         self.log_text.configure(yscrollcommand=log_scrollbar.set)
         
         self.log_text.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
         log_scrollbar.grid(row=0, column=1, sticky="ns")
 
+        # Update info label
+        info_label = ttk.Label(self.center_frame,
+                             text="Complete results will be saved in the logs subdirectory",
+                             font=Style.FONTS['text'],
+                             foreground=Style.COLORS['text'],
+                             background=Style.COLORS['bg'])
+        info_label.grid(row=1, column=0, columnspan=2, sticky="ew", padx=5, pady=(0, 5))
+
     def setup_participants_listbox(self):
-        
-        listbox_frame = ttk.Frame(self.right_frame)
+        # Update frame style
+        listbox_frame = ttk.Frame(self.right_frame, style='Custom.TFrame')
         listbox_frame.pack(fill=tk.BOTH, expand=True)
         
-        self.bot_listbox = tk.Listbox(listbox_frame, selectmode=tk.MULTIPLE)
-        scrollbar = ttk.Scrollbar(listbox_frame, orient="vertical", command=self.bot_listbox.yview)
+        # First create the listbox
+        self.bot_listbox = tk.Listbox(listbox_frame,
+                                     selectmode=tk.MULTIPLE,
+                                     bg=Style.COLORS['button'],
+                                     fg=Style.COLORS['text'],
+                                     font=Style.FONTS['text'],
+                                     selectbackground=Style.COLORS['button_hover'],
+                                     selectforeground=Style.COLORS['text'])
+        
+        scrollbar = ttk.Scrollbar(listbox_frame, 
+                                orient="vertical",
+                                command=self.bot_listbox.yview)
         self.bot_listbox.configure(yscrollcommand=scrollbar.set)
         
+        # Then create the Select All checkbox
+        self.select_all_var = tk.BooleanVar()
+        select_all_btn = ttk.Checkbutton(
+            self.right_frame,
+            text="Select All",
+            variable=self.select_all_var,
+            style='Custom.TCheckbutton',
+            command=self.toggle_select_all)
+        select_all_btn.pack(pady=(5,0), anchor="w")
+        
+        # Now pack the listbox and scrollbar
         self.bot_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
+        # Update the listbox content
         self.update_bot_dropdown()
         
-        ttk.Button(self.right_frame, text="Add Custom Bot", command=self.add_custom_bot).pack(pady=5)
+        custom_btn = tk.Button(self.right_frame, 
+                             text="Add Custom Bot",
+                             command=self.add_custom_bot,
+                             **Style.button_style())
+        custom_btn.pack(pady=5)
+        
+        # Add hover effect
+        custom_btn.bind('<Enter>', lambda e: custom_btn.configure(bg=Style.COLORS['button_hover']))
+        custom_btn.bind('<Leave>', lambda e: custom_btn.configure(bg=Style.COLORS['button']))
 
         # Bind tooltip events
         self.bot_listbox.bind('<Motion>', self.schedule_tooltip)
         self.bot_listbox.bind('<Leave>', self.schedule_hide_tooltip)
+
+    def toggle_select_all(self):
+        """Toggle select all items in the listbox"""
+        if self.select_all_var.get():
+            self.bot_listbox.select_set(0, tk.END)
+        else:
+            self.bot_listbox.selection_clear(0, tk.END)
 
     def add_custom_bot(self):
         filepath = filedialog.askopenfilename(
@@ -334,9 +484,12 @@ class GameUI:
                 frame = ttk.Frame(self.tooltip, style='TFrame')
                 frame.pack(fill=tk.BOTH, expand=True)
                 
-                label = ttk.Label(frame, text=description,
-                                background='#2a2a2a', foreground='white',
-                                wraplength=200, padding=5)
+                label = ttk.Label(frame, 
+                                 text=description,
+                                 background=Style.COLORS['button'],
+                                 foreground=Style.COLORS['text'],
+                                 wraplength=200,
+                                 padding=5)
                 label.pack(fill=tk.BOTH, expand=True)
 
     def hide_bot_description(self, event=None):

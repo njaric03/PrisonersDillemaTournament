@@ -2,17 +2,24 @@ import tkinter as tk
 from tkinter import ttk
 from interface.game_ui import GameUI
 from interface.menu_screen import MenuScreen
+from .shared_style import Style
 
 class TournamentScreen:
     def __init__(self, root):
         self.root = root
-        self.root.state('zoomed')  # Add this line
+        self.root.state('zoomed')
         self.root.title("Tournament Mode")
+        self.root.configure(bg=Style.COLORS['bg'])
         self.setup_ui()
 
     def setup_ui(self):
-        # Configure dark theme and ensure proper window size
-        self.root.configure(bg='#1a1a1a')
+        # Configure ttk style
+        style = ttk.Style()
+        style.configure('Custom.TFrame', background=Style.COLORS['bg'])
+        style.configure('Custom.TLabelframe', background=Style.COLORS['bg'], foreground=Style.COLORS['text'])
+        style.configure('Custom.TLabelframe.Label', background=Style.COLORS['bg'], foreground=Style.COLORS['text'])
+        style.configure('Custom.TButton', **Style.button_style())
+        style.configure('Custom.TCheckbutton', background=Style.COLORS['bg'], foreground=Style.COLORS['text'])
         
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
@@ -21,13 +28,8 @@ class TournamentScreen:
         self.root.grid_rowconfigure(0, weight=1)
         self.root.grid_columnconfigure(0, weight=1)
         
-        style = ttk.Style()
-        style.theme_use('default')
-        style.configure('TFrame', background='#1a1a1a')
-        style.configure('TButton', padding=10, width=30)  # Removed custom button styling
-        
         # Create main frame
-        self.main_frame = ttk.Frame(self.root, padding="20")
+        self.main_frame = ttk.Frame(self.root, padding="20", style='Custom.TFrame')
         self.main_frame.grid(row=0, column=0, sticky="nsew")
         
         # Configure grid weights
@@ -39,60 +41,68 @@ class TournamentScreen:
         self.main_frame.grid_columnconfigure(0, weight=1)
         
         # Title (moved up)
-        title_label = ttk.Label(self.main_frame, 
+        title_label = tk.Label(self.main_frame,
                               text="Tournament Mode",
-                              font=('Helvetica', 24),
-                              foreground='white',
-                              background='#1a1a1a')
+                              font=Style.FONTS['title'],
+                              fg=Style.COLORS['text'],
+                              bg=Style.COLORS['bg'])
         title_label.grid(row=0, column=0, pady=(0, 10))
         
         # Separator
         separator = ttk.Separator(self.main_frame, orient='horizontal')
         separator.grid(row=1, column=0, sticky="ew", pady=10)
         
-        # Description
+        # Description with correct background color
         description = ttk.Label(self.main_frame,
                               text="Select multiple bots to participate in a round-robin tournament. Each bot will play against every other bot.",
-                              font=('Helvetica', 12),
-                              foreground='white',
-                              background='#1a1a1a',
+                              font=Style.FONTS['text'],
+                              foreground=Style.COLORS['text'],
+                              background=Style.COLORS['bg'],  # Match the background
                               wraplength=800)
         description.grid(row=2, column=0, pady=(0, 20))
         
-        # Create the game UI without checkbox parameter
+        # Update the style for LabelFrames
+        style.configure('Custom.TLabelframe', 
+                      background=Style.COLORS['bg'],
+                      foreground=Style.COLORS['text'])
+        style.configure('Custom.TLabelframe.Label', 
+                      background=Style.COLORS['bg'],
+                      foreground=Style.COLORS['text'])
+        
+        # Create the game UI with custom style
         self.game_ui = GameUI(self.main_frame)
         self.game_ui.main_frame.grid(row=3, column=0, sticky="nsew")
         self.game_ui.bot_listbox.configure(selectmode=tk.MULTIPLE)
         
-        # Add select all button to the game UI's right frame above listbox
-        self.select_all_var = tk.BooleanVar()
-        self.select_all_btn = ttk.Checkbutton(
-            self.game_ui.right_frame,
-            text="Select All",
-            variable=self.select_all_var,
-            command=self.toggle_select_all)
-        self.select_all_btn.pack(before=self.game_ui.bot_listbox, pady=(5,0), anchor="w")
+        # Update only the frames that exist in tournament mode
+        for frame in [self.game_ui.center_frame, self.game_ui.right_frame]:
+            frame.configure(style='Custom.TLabelframe')
         
         # Create bottom button frame (in row 4)
-        button_frame = ttk.Frame(self.main_frame, style='TFrame')
+        button_frame = tk.Frame(self.main_frame, bg=Style.COLORS['bg'])
         button_frame.grid(row=4, column=0, sticky="ew", pady=(10, 0))
-        button_frame.grid_columnconfigure(0, weight=0)  # Back button
-        button_frame.grid_columnconfigure(1, weight=1)  # Space
-        button_frame.grid_columnconfigure(2, weight=0)  # Start button
+        button_frame.grid_columnconfigure(0, weight=0)
+        button_frame.grid_columnconfigure(1, weight=1)
+        button_frame.grid_columnconfigure(2, weight=0)
         
-        # Back button on left, no extra width
-        ttk.Button(button_frame, 
-                  text="Back to Menu",
-                  style='TButton',
-                  width=15,
-                  command=self.back_to_menu).grid(row=0, column=0, padx=5)
+        # Back button on left with shared style
+        back_btn = tk.Button(button_frame, 
+                           text="Back to Menu",
+                           command=self.back_to_menu,
+                           **Style.button_style())
+        back_btn.grid(row=0, column=0, padx=5)
         
-        # Start button on right, no extra width
-        ttk.Button(button_frame,
-                  text="Start Tournament",
-                  style='TButton',
-                  width=15,
-                  command=self.start_tournament).grid(row=0, column=2, padx=5)
+        # Tournament button on right with shared style
+        start_btn = tk.Button(button_frame,
+                            text="Start Tournament",
+                            command=self.start_tournament,
+                            **Style.button_style())
+        start_btn.grid(row=0, column=2, padx=5)
+        
+        # Add hover effects
+        for btn in [back_btn, start_btn]:
+            btn.bind('<Enter>', lambda e, b=btn: b.configure(bg=Style.COLORS['button_hover']))
+            btn.bind('<Leave>', lambda e, b=btn: b.configure(bg=Style.COLORS['button']))
         
     def start_tournament(self):
         self.game_ui.start_tournament()  # Now using the stored instance
@@ -101,9 +111,3 @@ class TournamentScreen:
         for widget in self.root.winfo_children():
             widget.destroy()
         MenuScreen(self.root)
-
-    def toggle_select_all(self):
-        if self.select_all_var.get():
-            self.game_ui.bot_listbox.select_set(0, tk.END)
-        else:
-            self.game_ui.bot_listbox.selection_clear(0, tk.END)

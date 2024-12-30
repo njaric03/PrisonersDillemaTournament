@@ -26,7 +26,7 @@ class TournamentSimulation:
 
     def run_all_against_all(self, bot_paths, rounds=100):
         """Conduct a round-robin tournament where each bot plays against each other."""
-        timestamp = datetime.now().strftime("%H%M")
+        timestamp = datetime.now().strftime("%H%M%S")
         tournament_dir = os.path.join(self.logs_dir, f"{timestamp}_tournament")
         os.makedirs(tournament_dir)
 

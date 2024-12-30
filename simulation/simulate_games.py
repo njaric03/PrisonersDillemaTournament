@@ -40,7 +40,7 @@ class PrisonersDilemmaSimulation:
 
     def run_games(self, opponent_paths, rounds=100):
         """Run games against multiple opponents."""
-        timestamp = datetime.now().strftime("%H%M")
+        timestamp = datetime.now().strftime("%H%M%S")
         games_dir = os.path.join(self.logs_dir, f"{timestamp}_{self.bot1.name}_games")
         os.makedirs(games_dir)
 
@@ -69,7 +69,7 @@ class PrisonersDilemmaSimulation:
             'scores': {self.bot1.name: 0, opponent.name: 0}
         }
 
-        timestamp = datetime.now().strftime("%H%M")
+        timestamp = datetime.now().strftime("%H%M%S")
         log_filename = f"{timestamp}_vs_{opponent.name}.txt"
         log_path = os.path.join(tournament_dir, log_filename)
 
