@@ -153,7 +153,7 @@ class PrisonersDilemmaSimulation:
                 stats = stat['stats']
                 f.write(f"Against {opponent}:\n")
                 f.write("-"*30 + "\n")
-                f.write(f"Score: {stats['scores'][self.bot1.name]}\n")
+                f.write(f"Score: {stats['scores'][self.bot1.name]} - {stats['scores'][opponent]}\n")
                 f.write(f"Mutual Cooperation: {stats['mutual_cooperation']}\n")
                 f.write(f"Mutual Defection: {stats['mutual_defection']}\n")
                 f.write(f"Times Betrayed: {stats['opponent_betrayals']}\n")
@@ -164,7 +164,9 @@ class PrisonersDilemmaSimulation:
             f.write("-"*30 + "\n")
             total_games = len(all_stats)
             total_score = sum(s['stats']['scores'][self.bot1.name] for s in all_stats)
+            total_opponent_score = sum(s['stats']['scores'][s['opponent']] for s in all_stats)
             avg_score = total_score / total_games
+            avg_opponent_score = total_opponent_score / total_games
             f.write(f"Total Games: {total_games}\n")
-            f.write(f"Total Score: {total_score}\n")
-            f.write(f"Average Score: {avg_score:.1f}\n")
+            f.write(f"Total Score: {total_score} - {total_opponent_score}\n")
+            f.write(f"Average Score: {avg_score:.1f} - {avg_opponent_score:.1f}\n")
