@@ -116,6 +116,35 @@ class GameUI:
             # Add participants listbox
             self.setup_participants_listbox()
 
+        elif self.mode == "multiple":
+            # Multiple test mode - similar to tournament mode
+            self.main_frame.grid_columnconfigure(0, weight=2)  # Log
+            self.main_frame.grid_columnconfigure(1, weight=1)  # Participants
+
+            # Create and configure frames similarly to tournament mode
+            self.center_frame = ttk.LabelFrame(self.main_frame, 
+                                             text="Games Log", 
+                                             padding="10",
+                                             style='Custom.TLabelframe')
+            self.right_frame = ttk.LabelFrame(self.main_frame, 
+                                            text="Opponents", 
+                                            padding="10",
+                                             style='Custom.TLabelframe')
+            
+            self.center_frame.grid(row=0, column=0, sticky="nsew", pady=20, padx=10)
+            self.right_frame.grid(row=0, column=1, sticky="nsew", pady=20, padx=10)
+            
+            # Configure frame weights
+            for frame in [self.center_frame, self.right_frame]:
+                frame.grid_rowconfigure(0, weight=3)
+                frame.grid_columnconfigure(0, weight=1)
+
+            # Add log text widget
+            self.setup_log_widget()
+            
+            # Add participants listbox with same structure as tournament
+            self.setup_participants_listbox()
+
         else:
             # Regular mode - original three-column layout
             # Configure all grid weights for vertical expansion
@@ -301,15 +330,16 @@ class GameUI:
         # Update the listbox content
         self.update_bot_dropdown()
         
-        custom_btn = tk.Button(self.right_frame, 
+        # Create the Add Custom Bot button and store reference
+        self.add_custom_bot_button = tk.Button(self.right_frame, 
                              text="Add Custom Bot",
                              command=self.add_custom_bot,
                              **Style.button_style())
-        custom_btn.pack(pady=5)
+        self.add_custom_bot_button.pack(pady=5)
         
         # Add hover effect
-        custom_btn.bind('<Enter>', lambda e: custom_btn.configure(bg=Style.COLORS['button_hover']))
-        custom_btn.bind('<Leave>', lambda e: custom_btn.configure(bg=Style.COLORS['button']))
+        self.add_custom_bot_button.bind('<Enter>', lambda e: self.add_custom_bot_button.configure(bg=Style.COLORS['button_hover']))
+        self.add_custom_bot_button.bind('<Leave>', lambda e: self.add_custom_bot_button.configure(bg=Style.COLORS['button']))
 
         # Bind tooltip events
         self.bot_listbox.bind('<Motion>', self.schedule_tooltip)

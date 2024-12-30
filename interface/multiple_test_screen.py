@@ -67,16 +67,6 @@ class MultipleTestScreen:
         self.game_ui.main_frame.grid(row=3, column=0, sticky="nsew")
         self.game_ui.bot_listbox.configure(selectmode=tk.MULTIPLE)
         
-        # Add Select All checkbox
-        self.select_all_var = tk.BooleanVar()
-        select_all_btn = ttk.Checkbutton(
-            self.game_ui.right_frame,
-            text="Select All",
-            variable=self.select_all_var,
-            style='Custom.TCheckbutton',
-            command=self.toggle_select_all)
-        select_all_btn.pack(pady=(5,0), anchor="w")
-        
         # Create bottom button frame (in row 4)
         button_frame = tk.Frame(self.main_frame, bg=Style.COLORS['bg'])
         button_frame.grid(row=4, column=0, sticky="ew", pady=(10, 0))
@@ -114,10 +104,3 @@ class MultipleTestScreen:
         for widget in self.root.winfo_children():
             widget.destroy()
         MenuScreen(self.root)
-
-    def toggle_select_all(self):
-        """Toggle select all items in the listbox"""
-        if self.select_all_var.get():
-            self.game_ui.bot_listbox.select_set(0, tk.END)
-        else:
-            self.game_ui.bot_listbox.selection_clear(0, tk.END)
