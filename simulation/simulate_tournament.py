@@ -2,7 +2,9 @@ from datetime import datetime
 import os
 from utils.abstract_bot import AbstractBot
 from utils.moves import Move
+from utils.game_config import GameConfig
 import importlib.util
+import random
 
 class TournamentSimulation:
     def __init__(self):
@@ -24,8 +26,12 @@ class TournamentSimulation:
         except Exception as e:
             raise Exception(f"Failed to load bot: {str(e)}")
 
-    def run_all_against_all(self, bot_paths, rounds=100):
-        """Conduct a round-robin tournament where each bot plays against each other."""
+    def run_all_against_all(self, bot_paths, rounds=GameConfig.DEFAULT_ROUNDS):
+        """Conduct a round-robin tournament where each bot plays against each other.
+        
+        If GameConfig.ADD_NOISE is True, the number of rounds per match will vary randomly
+        between 80% and 120% of the specified rounds value.
+        """
         timestamp = datetime.now().strftime("%H%M%S")
         tournament_dir = os.path.join(self.logs_dir, f"{timestamp}_tournament")
         os.makedirs(tournament_dir)
@@ -38,6 +44,11 @@ class TournamentSimulation:
             'mutual_defection': 0,
             'betrayals': {}  # Will track betrayals per bot
         }
+
+        # Calculate total rounds each bot should play
+        num_opponents = len(bot_paths) - 1
+        total_rounds_per_bot = num_opponents * rounds
+        remaining_rounds = {bot_path: total_rounds_per_bot for bot_path in bot_paths}
 
         # Run matches between all pairs of bots
         for i, bot1_path in enumerate(bot_paths):
@@ -56,8 +67,39 @@ class TournamentSimulation:
                     scores.setdefault(bot_name, 0)
                     matches_played.setdefault(bot_name, 0)
 
+                # Calculate rounds for this match while maintaining total
+                if GameConfig.ADD_NOISE:
+                    min_rounds = int(rounds * 0.8)
+                    max_rounds = int(rounds * 1.2)
+                    
+                    # Calculate remaining matches for both bots (including current match)
+                    remaining_matches_bot1 = sum(1 for x in bot_paths[i+1:] if x != bot1_path)
+                    remaining_matches_bot2 = sum(1 for x in bot_paths[i:] if x != bot2_path)
+                    
+                    # Ensure we have valid remaining matches counts
+                    if remaining_matches_bot1 == 0 or remaining_matches_bot2 == 0:
+                        match_rounds = remaining_rounds[bot1_path] if remaining_matches_bot1 == 0 else remaining_rounds[bot2_path]
+                    else:
+                        # Calculate average rounds needed per remaining match
+                        avg_rounds_bot1 = remaining_rounds[bot1_path] // remaining_matches_bot1
+                        avg_rounds_bot2 = remaining_rounds[bot2_path] // remaining_matches_bot2
+                        
+                        # Set bounds for this match
+                        match_min = max(min_rounds, min(avg_rounds_bot1, avg_rounds_bot2))
+                        match_max = min(max_rounds, 
+                                      remaining_rounds[bot1_path],
+                                      remaining_rounds[bot2_path])
+                        
+                        match_rounds = random.randint(match_min, max(match_min, match_max))
+                else:
+                    match_rounds = rounds
+
+                # Update remaining rounds
+                remaining_rounds[bot1_path] -= match_rounds
+                remaining_rounds[bot2_path] -= match_rounds
+
                 # Run match
-                match_stats = self._run_match(bot1, bot2, rounds, tournament_dir)
+                match_stats = self._run_match(bot1, bot2, match_rounds, tournament_dir)
                 
                 # Update scores and statistics
                 scores[bot1.name] += match_stats['scores'][bot1.name]
@@ -69,6 +111,11 @@ class TournamentSimulation:
                 stats['mutual_defection'] += match_stats['mutual_defection']
                 stats['betrayals'][bot1.name] += match_stats['betrayals'][bot1.name]
                 stats['betrayals'][bot2.name] += match_stats['betrayals'][bot2.name]
+
+        # Verify all bots played their expected number of rounds
+        for bot_path, remaining in remaining_rounds.items():
+            if remaining != 0:
+                print(f"Warning: {os.path.basename(bot_path)} has {remaining} unplayed rounds")
 
         self._write_tournament_summary(tournament_dir, scores, stats, matches_played, rounds)
         return tournament_dir
@@ -88,41 +135,77 @@ class TournamentSimulation:
         bot2.my_history = []
         bot2.opponent_history = []
         
+        # Prepare output lines for detailed match history
+        output_lines = [
+            "="*50,
+            f"MATCH RESULTS - {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+            f"Bot 1: {bot1.name}",
+            f"Bot 2: {bot2.name}",
+            "="*50,
+            "",
+            "ROUND HISTORY:",
+            f"{'Round':^6} | {'Bot 1':^10} | {'Bot 2':^10} | {'Round Result':^12} | {'Current Score':^12}",
+            "-"*60
+        ]
+        
         # Play rounds
-        for _ in range(rounds):
-            # Get moves using proper AbstractBot interface
+        for round_num in range(rounds):
+            # Get both moves before updating histories
             move1 = bot1.make_decision()
             move2 = bot2.make_decision()
             
-            # Update both bots' history
-            bot1.update_history(move1, move2)
-            bot2.update_history(move2, move1)
+            # Update histories for both bots after both moves are known
+            bot1.opponent_history.append(move2)
+            bot1.my_history.append(move1)
+            bot2.opponent_history.append(move1)
+            bot2.my_history.append(move2)
             
-            # Update scores and stats
+            # Calculate round result and update scores
             if move1 == Move.COOPERATE and move2 == Move.COOPERATE:
-                scores[bot1.name] += 3
-                scores[bot2.name] += 3
+                round_result = f"{GameConfig.MUTUAL_COOPERATION_POINTS:^2} - {GameConfig.MUTUAL_COOPERATION_POINTS:^2}"
+                scores[bot1.name] += GameConfig.MUTUAL_COOPERATION_POINTS
+                scores[bot2.name] += GameConfig.MUTUAL_COOPERATION_POINTS
                 stats['mutual_cooperation'] += 1
             elif move1 == Move.COOPERATE and move2 == Move.DEFECT:
-                scores[bot2.name] += 5
+                round_result = f"{GameConfig.BETRAYED_POINTS:^2} - {GameConfig.BETRAYAL_POINTS:^2}"
+                scores[bot1.name] += GameConfig.BETRAYED_POINTS
+                scores[bot2.name] += GameConfig.BETRAYAL_POINTS
                 stats['betrayals'][bot2.name] += 1
             elif move1 == Move.DEFECT and move2 == Move.COOPERATE:
-                scores[bot1.name] += 5
+                round_result = f"{GameConfig.BETRAYAL_POINTS:^2} - {GameConfig.BETRAYED_POINTS:^2}"
+                scores[bot1.name] += GameConfig.BETRAYAL_POINTS
+                scores[bot2.name] += GameConfig.BETRAYED_POINTS
                 stats['betrayals'][bot1.name] += 1
             else:  # Both defect
-                scores[bot1.name] += 1
-                scores[bot2.name] += 1
+                round_result = f"{GameConfig.MUTUAL_DEFECTION_POINTS:^2} - {GameConfig.MUTUAL_DEFECTION_POINTS:^2}"
+                scores[bot1.name] += GameConfig.MUTUAL_DEFECTION_POINTS
+                scores[bot2.name] += GameConfig.MUTUAL_DEFECTION_POINTS
                 stats['mutual_defection'] += 1
+                
+            current_score = f"{scores[bot1.name]:^5} - {scores[bot2.name]:^5}"
+            output_lines.append(f"{round_num+1:^6} | {move1.name:^10} | {move2.name:^10} | {round_result:^12} | {current_score}")
+        
+        # Add final statistics
+        output_lines.extend([
+            "\nMATCH STATISTICS:",
+            "-"*50,
+            f"Total Rounds: {rounds}",
+            f"Mutual Cooperation: {stats['mutual_cooperation']} ({stats['mutual_cooperation']/rounds*100:.1f}%)",
+            f"Mutual Defection: {stats['mutual_defection']} ({stats['mutual_defection']/rounds*100:.1f}%)",
+            f"Betrayals by {bot1.name}: {stats['betrayals'][bot1.name]} ({stats['betrayals'][bot1.name]/rounds*100:.1f}%)",
+            f"Betrayals by {bot2.name}: {stats['betrayals'][bot2.name]} ({stats['betrayals'][bot2.name]/rounds*100:.1f}%)",
+            "",
+            "FINAL SCORES:",
+            "-"*50,
+            f"{bot1.name}: {scores[bot1.name]}",
+            f"{bot2.name}: {scores[bot2.name]}",
+            "="*50
+        ])
         
         # Write match results to file
         match_file = os.path.join(tournament_dir, f"{bot1.name}_vs_{bot2.name}.txt")
         with open(match_file, 'w') as f:
-            f.write(f"Match: {bot1.name} vs {bot2.name}\n")
-            f.write(f"Scores: {bot1.name}: {scores[bot1.name]}, {bot2.name}: {scores[bot2.name]}\n")
-            f.write(f"Mutual Cooperation: {stats['mutual_cooperation']}\n")
-            f.write(f"Mutual Defection: {stats['mutual_defection']}\n")
-            f.write(f"Betrayals by {bot1.name}: {stats['betrayals'][bot1.name]}\n")
-            f.write(f"Betrayals by {bot2.name}: {stats['betrayals'][bot2.name]}\n")
+            f.write('\n'.join(output_lines))
         
         return {
             'scores': scores,
@@ -132,26 +215,100 @@ class TournamentSimulation:
         }
 
     def _write_tournament_summary(self, directory, scores, stats, matches_played, rounds_per_match):
+        def clean_name(name):
+            name = name.replace(" Bot", "").strip()
+            # Add specific abbreviations for Always Cooperate and Always Defect
+            if name == "Always Cooperate":
+                return "Always C"
+            elif name == "Always Defect":
+                return "Always D"
+            return name
+
         summary_path = os.path.join(directory, "tournament_summary.txt")
         with open(summary_path, 'w') as f:
             f.write("="*50 + "\n")
             f.write("TOURNAMENT SUMMARY\n")
             f.write("="*50 + "\n\n")
 
-            # Leaderboard
-            f.write("LEADERBOARD\n")
-            f.write("-"*50 + "\n")
-            sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-            for bot, score in sorted_scores:
-                avg_score = score / matches_played[bot]
-                f.write(f"{bot}: {score} (avg per match: {avg_score:.1f})\n")
+            # Get unique bot names and calculate averages
+            bot_stats = []
+            for bot_name in scores.keys():
+                avg_score = scores[bot_name] / matches_played[bot_name]
+                bot_stats.append((bot_name, avg_score))
+            
+            # Sort bots by average score and clean names for display
+            bot_names = [bot[0] for bot in sorted(bot_stats, key=lambda x: x[1], reverse=True)]
+            display_names = {name: clean_name(name) for name in bot_names}
+            
+            # Calculate widths
+            name_width = max(len(name) for name in display_names.values())
+            score_width = max(name_width, 5)  # Ensure width can handle "---" and scores
+            
+            # Create and fill score matrix
+            score_matrix = {bot1: {bot2: 0 for bot2 in bot_names} for bot1 in bot_names}
+            
+            # Fill in score matrix from match results
+            for bot1 in bot_names:
+                for bot2 in bot_names:
+                    if bot1 != bot2:
+                        match_file = os.path.join(directory, f"{bot1}_vs_{bot2}.txt")
+                        if os.path.exists(match_file):
+                            with open(match_file, 'r') as mf:
+                                for line in mf:
+                                    if line.startswith(f"{bot1}: "):
+                                        score = int(line.split(": ")[1])
+                                        score_matrix[bot1][bot2] = score
+                        else:
+                            match_file = os.path.join(directory, f"{bot2}_vs_{bot1}.txt")
+                            if os.path.exists(match_file):
+                                with open(match_file, 'r') as mf:
+                                    for line in mf:
+                                        if line.startswith(f"{bot1}: "):
+                                            score = int(line.split(": ")[1])
+                                            score_matrix[bot1][bot2] = score
 
-            # Aggregate statistics
-            total_matches = sum(matches_played.values()) // 2
-            f.write("\n\nAGGREGATE STATISTICS\n")
+            # Write score matrix
+            f.write("SCORE MATRIX\n")
+            f.write("-"*50 + "\n\n")
+            
+            # Header row
+            f.write("Bot".ljust(name_width))
+            for bot in bot_names:
+                f.write(f" | {display_names[bot].center(score_width)}")
+            f.write(f" | {'Avg score'.center(score_width)}\n")
+            
+            # Separator line
+            total_width = name_width + (len(bot_names) + 1) * (score_width + 3)
+            f.write("-" * total_width + "\n")
+            
+            # Data rows
+            for bot1 in bot_names:
+                # First column (bot name)
+                f.write(display_names[bot1].ljust(name_width))
+                total_score = 0
+                matches = 0
+                
+                # Score columns
+                for bot2 in bot_names:
+                    if bot1 == bot2:
+                        f.write(f" | {'---'.center(score_width)}")
+                    else:
+                        score = score_matrix[bot1][bot2]
+                        f.write(f" | {str(score).center(score_width)}")
+                        total_score += score
+                        matches += 1
+                
+                # Average column
+                avg_score = total_score / matches if matches > 0 else 0
+                f.write(f" | {f'{avg_score:.1f}'.center(score_width)}\n")
+            
+            f.write("\n\n")
+
+            # Write statistics
+            f.write("AGGREGATE STATISTICS\n")
             f.write("-"*50 + "\n")
+            total_matches = sum(matches_played.values()) // 2
             f.write(f"Total Matches: {total_matches}\n")
             f.write(f"Average Mutual Cooperation: {stats['mutual_cooperation']/total_matches:.1f} per match\n")
             f.write(f"Average Mutual Defection: {stats['mutual_defection']/total_matches:.1f} per match\n")
             f.write(f"Average Bot Betrayals: {sum(stats['betrayals'].values())/total_matches:.1f} per match\n")
-

@@ -247,13 +247,13 @@ class GameUI:
         return frame
 
     def setup_log_widget(self):
-        # Update log widget with style
+        # Update log widget with monospace font for alignment
         self.log_text = tk.Text(self.center_frame, 
                                width=50, 
                                height=20,
                                bg=Style.COLORS['button'],
                                fg=Style.COLORS['text'],
-                               font=Style.FONTS['text'])
+                               font=('Courier', 10))  # Changed to Courier font
         log_scrollbar = ttk.Scrollbar(self.center_frame, 
                                     orient="vertical",
                                     command=self.log_text.yview)

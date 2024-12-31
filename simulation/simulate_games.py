@@ -1,8 +1,10 @@
 import importlib.util
 from utils.abstract_bot import AbstractBot
 from utils.moves import Move
+from utils.game_config import GameConfig
 from datetime import datetime
 import os
+import random
 
 class PrisonersDilemmaSimulation:
     def __init__(self, bot1_path):
@@ -30,15 +32,15 @@ class PrisonersDilemmaSimulation:
     def calculate_score(self, move1: Move, move2: Move):
         """Calculate scores based on moves"""
         if move1 == Move.COOPERATE and move2 == Move.COOPERATE:
-            return 3, 3
+            return GameConfig.MUTUAL_COOPERATION_POINTS, GameConfig.MUTUAL_COOPERATION_POINTS
         elif move1 == Move.COOPERATE and move2 == Move.DEFECT:
-            return 0, 5
+            return GameConfig.BETRAYED_POINTS, GameConfig.BETRAYAL_POINTS
         elif move1 == Move.DEFECT and move2 == Move.COOPERATE:
-            return 5, 0
+            return GameConfig.BETRAYAL_POINTS, GameConfig.BETRAYED_POINTS
         else:  # both defect
-            return 1, 1
+            return GameConfig.MUTUAL_DEFECTION_POINTS, GameConfig.MUTUAL_DEFECTION_POINTS
 
-    def run_games(self, opponent_paths, rounds=100):
+    def run_games(self, opponent_paths, rounds=GameConfig.DEFAULT_ROUNDS):
         """Run games against multiple opponents."""
         timestamp = datetime.now().strftime("%H%M%S")
         games_dir = os.path.join(self.logs_dir, f"{timestamp}_{self.bot1.name}_games")
@@ -49,8 +51,14 @@ class PrisonersDilemmaSimulation:
             # Load opponent bot
             opponent = self.load_bot(opponent_path)
             
-            # Run the match and collect stats
-            match_stats = self._run_match(opponent, rounds, games_dir)
+            # Calculate number of rounds for this match
+            match_rounds = rounds
+            if GameConfig.ADD_NOISE:
+                min_rounds = int(rounds * 0.8)
+                max_rounds = int(rounds * 1.2)
+                match_rounds = random.randint(min_rounds, max_rounds)
+
+            match_stats = self._run_match(opponent, match_rounds, games_dir)
             all_stats.append({
                 'opponent': opponent.name,
                 'stats': match_stats
@@ -69,6 +77,12 @@ class PrisonersDilemmaSimulation:
             'scores': {self.bot1.name: 0, opponent.name: 0}
         }
 
+        # Reset histories at start of match
+        self.bot1.my_history = []
+        self.bot1.opponent_history = []
+        opponent.my_history = []
+        opponent.opponent_history = []
+
         timestamp = datetime.now().strftime("%H%M%S")
         log_filename = f"{timestamp}_vs_{opponent.name}.txt"
         log_path = os.path.join(tournament_dir, log_filename)
@@ -80,43 +94,45 @@ class PrisonersDilemmaSimulation:
             f"Bot 1: {self.bot1.name}",
             f"Bot 2: {opponent.name}",
             "="*50,
-            ""
-        ])
-
-        output_lines.extend([
+            "",
             "ROUND HISTORY:",
-            f"{'Round':^6} | {'Bot 1':^10} | {'Bot 2':^10} | {'Score':^12}",
-            "-"*42
+            f"{'Round':^6} | {'Bot 1':^10} | {'Bot 2':^10} | {'Round Result':^12} | {'Current Score':^12}",
+            "-"*60
         ])
 
         for round_num in range(rounds):
-            move1 = self.bot1.strategy([])
-            move2 = opponent.strategy([])
+            move1 = self.bot1.make_decision()  # Change strategy([]) to make_decision()
+            move2 = opponent.make_decision()   # Change strategy([]) to make_decision()
 
-            score1, score2 = self.calculate_score(move1, move2)
+            # Update histories for both bots
+            self.bot1.my_history.append(move1)
+            self.bot1.opponent_history.append(move2)
+            opponent.my_history.append(move2)
+            opponent.opponent_history.append(move1)
+
+            # Calculate score and determine round result
+            if move1 == Move.COOPERATE and move2 == Move.COOPERATE:
+                round_result = f"{GameConfig.MUTUAL_COOPERATION_POINTS:^2} - {GameConfig.MUTUAL_COOPERATION_POINTS:^2}"
+                score1, score2 = GameConfig.MUTUAL_COOPERATION_POINTS, GameConfig.MUTUAL_COOPERATION_POINTS
+                stats['mutual_cooperation'] += 1
+            elif move1 == Move.COOPERATE and move2 == Move.DEFECT:
+                round_result = f"{GameConfig.BETRAYED_POINTS:^2} - {GameConfig.BETRAYAL_POINTS:^2}"
+                score1, score2 = GameConfig.BETRAYED_POINTS, GameConfig.BETRAYAL_POINTS
+                stats['opponent_betrayals'] += 1
+            elif move1 == Move.DEFECT and move2 == Move.COOPERATE:
+                round_result = f"{GameConfig.BETRAYAL_POINTS:^2} - {GameConfig.BETRAYED_POINTS:^2}"
+                score1, score2 = GameConfig.BETRAYAL_POINTS, GameConfig.BETRAYED_POINTS
+                stats['bot1_betrayals'] += 1
+            else:  # Both defect
+                round_result = f"{GameConfig.MUTUAL_DEFECTION_POINTS:^2} - {GameConfig.MUTUAL_DEFECTION_POINTS:^2}"
+                score1, score2 = GameConfig.MUTUAL_DEFECTION_POINTS, GameConfig.MUTUAL_DEFECTION_POINTS
+                stats['mutual_defection'] += 1
+
             stats['scores'][self.bot1.name] += score1
             stats['scores'][opponent.name] += score2
 
-            if move1 == Move.COOPERATE and move2 == Move.COOPERATE:
-                stats['mutual_cooperation'] += 1
-            elif move1 == Move.DEFECT and move2 == Move.DEFECT:
-                stats['mutual_defection'] += 1
-            elif move1 == Move.DEFECT and move2 == Move.COOPERATE:
-                stats['bot1_betrayals'] += 1
-            else:
-                stats['opponent_betrayals'] += 1
-
-            output_lines.append(f"{round_num+1:^6} | {move1.name:^10} | {move2.name:^10} | {score1:^5}-{score2:^5}")
-
-        scores_section = [
-            "SCORES:",
-            "-"*50,
-            f"{self.bot1.name}: {stats['scores'][self.bot1.name]}",
-            f"{opponent.name}: {stats['scores'][opponent.name]}",
-            "-"*50,
-            ""
-        ]
-        output_lines[6:6] = scores_section
+            current_score = f"{stats['scores'][self.bot1.name]:^5} - {stats['scores'][opponent.name]:^5}"
+            output_lines.append(f"{round_num+1:^6} | {move1.name:^10} | {move2.name:^10} | {round_result:^12} | {current_score}")
 
         output_lines.extend([
             "\nMATCH STATISTICS:",
