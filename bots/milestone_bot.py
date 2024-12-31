@@ -23,7 +23,7 @@ class MilestoneBot(AbstractBot):
         ]
         return current_round in milestones
     
-    def strategy(self, opponent_history: List[Move]) -> Move:
-        if self.is_milestone_round(self.current_round):
+    def strategy(self, opponent_history: List[Move], current_round: int, total_rounds: int) -> Move:
+        if self.is_milestone_round(current_round):
             return self.defect
         return self.cooperate

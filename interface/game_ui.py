@@ -247,20 +247,29 @@ class GameUI:
         return frame
 
     def setup_log_widget(self):
-        # Update log widget with monospace font for alignment
+        # Update log widget with monospace font and increased width
         self.log_text = tk.Text(self.center_frame, 
-                               width=50, 
+                               width=80,  # Increased from 50 to 80
                                height=20,
                                bg=Style.COLORS['button'],
                                fg=Style.COLORS['text'],
-                               font=('Courier', 10))  # Changed to Courier font
-        log_scrollbar = ttk.Scrollbar(self.center_frame, 
-                                    orient="vertical",
-                                    command=self.log_text.yview)
-        self.log_text.configure(yscrollcommand=log_scrollbar.set)
+                               font=('Courier', 10),
+                               wrap=tk.NONE)  # Disable text wrapping
+
+        # Add horizontal scrollbar
+        h_scrollbar = ttk.Scrollbar(self.center_frame, 
+                                  orient="horizontal",
+                                  command=self.log_text.xview)
+        v_scrollbar = ttk.Scrollbar(self.center_frame, 
+                                  orient="vertical",
+                                  command=self.log_text.yview)
+        self.log_text.configure(xscrollcommand=h_scrollbar.set,
+                              yscrollcommand=v_scrollbar.set)
         
+        # Grid layout to accommodate both scrollbars
         self.log_text.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
-        log_scrollbar.grid(row=0, column=1, sticky="ns")
+        v_scrollbar.grid(row=0, column=1, sticky="ns")
+        h_scrollbar.grid(row=1, column=0, sticky="ew")
 
         # Update info label
         info_label = ttk.Label(self.center_frame,
@@ -268,7 +277,21 @@ class GameUI:
                              font=Style.FONTS['text'],
                              foreground=Style.COLORS['text'],
                              background=Style.COLORS['bg'])
-        info_label.grid(row=1, column=0, columnspan=2, sticky="ew", padx=5, pady=(0, 5))
+        info_label.grid(row=2, column=0, columnspan=2, sticky="ew", padx=5, pady=(0, 5))
+
+    def update_log(self, text):
+        self.log_text.delete(1.0, tk.END)
+        
+        # Format the text for better alignment with tab stops
+        if "Tournament Results" in text:
+            # Set tab stops every 15 characters
+            self.log_text.tag_configure("align", tabs=("15c", "30c", "45c", "60c"))
+            self.log_text.insert(tk.END, text, "align")
+        else:
+            self.log_text.insert(tk.END, text)
+            
+        self.log_text.see(tk.END)
+        self.log_text.update_idletasks()
 
     def setup_participants_listbox(self):
         # Update frame style
@@ -507,8 +530,17 @@ class GameUI:
 
     def update_log(self, text):
         self.log_text.delete(1.0, tk.END)
-        self.log_text.insert(tk.END, text)
+        
+        # Format the text for better alignment with tab stops
+        if "Tournament Results" in text:
+            # Set tab stops every 15 characters
+            self.log_text.tag_configure("align", tabs=("15c", "30c", "45c", "60c"))
+            self.log_text.insert(tk.END, text, "align")
+        else:
+            self.log_text.insert(tk.END, text)
+            
         self.log_text.see(tk.END)
+        self.log_text.update_idletasks()
 
     def read_latest_log(self, summary_type="game"):
         """Read the latest log file of specified type"""
