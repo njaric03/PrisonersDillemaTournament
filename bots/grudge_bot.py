@@ -1,10 +1,10 @@
-
 from utils.abstract_bot import AbstractBot
 from utils.moves import Move
 from typing import List
 
 class GrudgeBot(AbstractBot):
     def __init__(self):
+        super().__init__()  # Add this line to initialize parent class
         self.been_betrayed = False
     
     @property
@@ -15,7 +15,7 @@ class GrudgeBot(AbstractBot):
     def description(self) -> str:
         return "A bot that never forgives betrayal"
     
-    def strategy(self, opponent_history: List[Move]) -> Move:
+    def strategy(self, opponent_history: List[Move], current_round: int, total_rounds: int) -> Move:
         if not opponent_history:
             return self.cooperate
             

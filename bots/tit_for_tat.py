@@ -11,7 +11,7 @@ class TitForTatBot(AbstractBot):
     def description(self) -> str:
         return "A bot that copies opponent's last move"
     
-    def strategy(self, opponent_history: List[Move]) -> Move:
+    def strategy(self, opponent_history: List[Move], current_round: int, total_rounds: int) -> Move:
         if not opponent_history:
             return self.cooperate
         return opponent_history[-1]
