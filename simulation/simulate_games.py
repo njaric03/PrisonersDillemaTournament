@@ -40,7 +40,7 @@ class PrisonersDilemmaSimulation:
         else:  # both defect
             return GameConfig.MUTUAL_DEFECTION_POINTS, GameConfig.MUTUAL_DEFECTION_POINTS
 
-    def run_games(self, opponent_paths, rounds=GameConfig.DEFAULT_ROUNDS):
+    def run_games(self, opponent_paths, rounds=GameConfig.NUMBER_OF_ROUNDS):
         """Run games against multiple opponents."""
         timestamp = datetime.now().strftime("%H%M%S")
         games_dir = os.path.join(self.logs_dir, f"{timestamp}_{self.bot1.name}_games")

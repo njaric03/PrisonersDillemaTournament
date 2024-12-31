@@ -1,13 +1,14 @@
 from abc import ABC, abstractmethod
 from utils.moves import Move
+from utils.game_config import GameConfig
 from typing import List
 
 class AbstractBot(ABC):
     def __init__(self):
         self.my_history = []
         self.opponent_history = []
-        self.total_rounds = 0  # Add this line
-        
+        self.total_rounds = GameConfig.NUMBER_OF_ROUNDS
+    
     @property
     @abstractmethod
     def name(self) -> str:

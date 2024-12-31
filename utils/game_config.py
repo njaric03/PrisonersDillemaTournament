@@ -12,7 +12,7 @@ class GameConfig:
     MUTUAL_DEFECTION_POINTS = 1
     
     # Default number of rounds per match
-    DEFAULT_ROUNDS = 100
+    NUMBER_OF_ROUNDS = 100
 
     # Whether to add noise to number of rounds
     ADD_NOISE = False

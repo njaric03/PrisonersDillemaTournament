@@ -26,7 +26,7 @@ class TournamentSimulation:
         except Exception as e:
             raise Exception(f"Failed to load bot: {str(e)}")
 
-    def run_all_against_all(self, bot_paths, rounds=GameConfig.DEFAULT_ROUNDS):
+    def run_all_against_all(self, bot_paths, rounds=GameConfig.NUMBER_OF_ROUNDS):
         """Conduct a round-robin tournament where each bot plays against each other.
         
         If GameConfig.ADD_NOISE is True, the number of rounds per match will vary randomly
