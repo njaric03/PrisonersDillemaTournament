@@ -145,8 +145,7 @@ class TournamentScreen:
                 from interface.tournament_visualizer import TournamentVisualizer
                 csv_path = os.path.join(tournament_dir, "results.csv")
                 visualizer = TournamentVisualizer(csv_path)
-                visualizer.animate_results(delay=1.0)
-                visualizer.show()
+                visualizer.show()  # Remove animate_results call, only use show()
                 
         except Exception as e:
             self.game_ui.log_text.delete(1.0, tk.END)
