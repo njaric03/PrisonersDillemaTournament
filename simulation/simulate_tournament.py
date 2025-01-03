@@ -26,7 +26,7 @@ class TournamentSimulation:
         except Exception as e:
             raise Exception(f"Failed to load bot: {str(e)}")
 
-    def run_all_against_all(self, bot_paths, rounds=GameConfig.NUMBER_OF_ROUNDS):
+    def run_all_against_all(self, bot_paths, rounds=GameConfig.NUMBER_OF_ROUNDS, visualize=False):
         """Conduct a round-robin tournament where each bot plays against each other.
         
         If GameConfig.ADD_NOISE is True, the number of rounds per match will vary randomly
@@ -117,7 +117,43 @@ class TournamentSimulation:
             if remaining != 0:
                 print(f"Warning: {os.path.basename(bot_path)} has {remaining} unplayed rounds")
 
-        self._write_tournament_summary(tournament_dir, scores, stats, matches_played, rounds)
+        # After matches are done and before writing summary
+        bot_stats = []
+        for bot_name in scores.keys():
+            avg_score = scores[bot_name] / matches_played[bot_name]
+            bot_stats.append((bot_name, avg_score))
+        
+        # Sort bots by average score
+        bot_names = [bot[0] for bot in sorted(bot_stats, key=lambda x: x[1], reverse=True)]
+        display_names = {name: name.replace(" Bot", "").strip() for name in bot_names}
+        
+        # Create score matrix
+        score_matrix = {bot1: {bot2: 0 for bot2 in bot_names} for bot1 in bot_names}
+        
+        # Fill score matrix from match results
+        for bot1 in bot_names:
+            for bot2 in bot_names:
+                if bot1 != bot2:
+                    match_file = os.path.join(tournament_dir, f"{bot1}_vs_{bot2}.txt")
+                    if os.path.exists(match_file):
+                        with open(match_file, 'r') as mf:
+                            for line in mf:
+                                if line.startswith(f"{bot1}: "):
+                                    score = int(line.split(": ")[1])
+                                    score_matrix[bot1][bot2] = score
+                    else:
+                        match_file = os.path.join(tournament_dir, f"{bot2}_vs_{bot1}.txt")
+                        if os.path.exists(match_file):
+                            with open(match_file, 'r') as mf:
+                                for line in mf:
+                                    if line.startswith(f"{bot1}: "):
+                                        score = int(line.split(": ")[1])
+                                        score_matrix[bot1][bot2] = score
+        
+        # Write summary and export CSV
+        self._write_tournament_summary(tournament_dir, scores, stats, matches_played, rounds, bot_names, display_names, score_matrix)
+        self._export_score_matrix_csv(directory=tournament_dir, bot_names=bot_names, display_names=display_names, score_matrix=score_matrix)
+        
         return tournament_dir
 
     def _run_match(self, bot1, bot2, rounds, tournament_dir):
@@ -214,15 +250,13 @@ class TournamentSimulation:
             'betrayals': stats['betrayals']
         }
 
-    def _write_tournament_summary(self, directory, scores, stats, matches_played, rounds_per_match):
+    def _write_tournament_summary(self, directory, scores, stats, matches_played, rounds_per_match, bot_names, display_names, score_matrix):
         def clean_name(name):
-            name = name.replace(" Bot", "").strip()
-            # Add specific abbreviations for Always Cooperate and Always Defect
             if name == "Always Cooperate":
                 return "Always C"
             elif name == "Always Defect":
                 return "Always D"
-            return name
+            return display_names[name]
 
         summary_path = os.path.join(directory, "tournament_summary.txt")
         with open(summary_path, 'w') as f:
@@ -240,9 +274,10 @@ class TournamentSimulation:
             bot_names = [bot[0] for bot in sorted(bot_stats, key=lambda x: x[1], reverse=True)]
             display_names = {name: clean_name(name) for name in bot_names}
             
-            # Calculate widths
+            # Calculate widths - need to account for "vs " prefix in header width
             name_width = max(len(name) for name in display_names.values())
-            score_width = max(name_width, 5)  # Ensure width can handle "---" and scores
+            vs_width = max(len(f"vs {name}") for name in display_names.values())  # Width including "vs "
+            score_width = max(vs_width, 5)  # Width for score columns
             
             # Create and fill score matrix
             score_matrix = {bot1: {bot2: 0 for bot2 in bot_names} for bot1 in bot_names}
@@ -274,21 +309,19 @@ class TournamentSimulation:
             # Header row
             f.write("Bot".ljust(name_width))
             for bot in bot_names:
-                f.write(f" | {display_names[bot].center(score_width)}")
+                f.write(f" | {f'vs {display_names[bot]}'.center(score_width)}")
             f.write(f" | {'Avg score'.center(score_width)}\n")
             
-            # Separator line
+            # Separator line - adjust for new widths
             total_width = name_width + (len(bot_names) + 1) * (score_width + 3)
             f.write("-" * total_width + "\n")
             
-            # Data rows
+            # Data rows - all cells use same width as headers
             for bot1 in bot_names:
-                # First column (bot name)
                 f.write(display_names[bot1].ljust(name_width))
                 total_score = 0
                 matches = 0
                 
-                # Score columns
                 for bot2 in bot_names:
                     if bot1 == bot2:
                         f.write(f" | {'---'.center(score_width)}")
@@ -298,7 +331,7 @@ class TournamentSimulation:
                         total_score += score
                         matches += 1
                 
-                # Average column
+                # Average column uses same width
                 avg_score = total_score / matches if matches > 0 else 0
                 f.write(f" | {f'{avg_score:.1f}'.center(score_width)}\n")
             
@@ -312,3 +345,34 @@ class TournamentSimulation:
             f.write(f"Average Mutual Cooperation: {stats['mutual_cooperation']/total_matches:.1f} per match\n")
             f.write(f"Average Mutual Defection: {stats['mutual_defection']/total_matches:.1f} per match\n")
             f.write(f"Average Bot Betrayals: {sum(stats['betrayals'].values())/total_matches:.1f} per match\n")
+        
+        # After writing the tournament summary, export the CSV
+        self._export_score_matrix_csv(directory, bot_names, display_names, score_matrix)
+
+    def _export_score_matrix_csv(self, directory, bot_names, display_names, score_matrix):
+        """Export the score matrix as a CSV file."""
+        csv_path = os.path.join(directory, "results.csv")
+        with open(csv_path, 'w') as f:
+            # Write header row
+            f.write("Bot," + ",".join([display_names[bot] for bot in bot_names]) + ",Average\n")
+            
+            # Write data rows using actual match scores
+            for bot1 in bot_names:
+                row = [display_names[bot1]]
+                total_score = 0
+                matches = 0
+                
+                for bot2 in bot_names:
+                    if bot1 == bot2:
+                        row.append("")  # Empty cell for self-play
+                    else:
+                        match_score = score_matrix[bot1][bot2]
+                        row.append(str(match_score))
+                        total_score += match_score
+                        matches += 1
+                
+                # Calculate and append average
+                avg_score = total_score / matches if matches > 0 else 0
+                row.append(f"{avg_score:.1f}")
+                
+                f.write(",".join(row) + "\n")

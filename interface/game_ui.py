@@ -34,6 +34,7 @@ class GameUI:
         self.tournament_button = None
         self.player2_path = None
         self.player2_entry = None
+        self.bot_paths = []  # Add bot_paths as instance variable
         
         # Configure parent frame to expand
         parent.grid_rowconfigure(1, weight=1)  # Changed from 0 to 1 to match the content row
@@ -375,6 +376,7 @@ class GameUI:
                     bot_instance = bot_class()
                     display_name = f"{bot_instance.name} (Custom)"
                     self.filename_to_display[display_name] = filepath
+                    self.bot_paths.append(filepath)  # Add to bot paths
                     self.bot_listbox.insert(tk.END, display_name)
                 else:
                     messagebox.showerror("Error", "No valid bot class found in file")
@@ -444,13 +446,18 @@ class GameUI:
         return bots
 
     def update_bot_dropdown(self):
-        """Update listbox with bot names"""
+        """Update listbox with bot names and maintain bot paths"""
         self.bot_listbox.delete(0, tk.END)
         self.filename_to_display = {}
+        self.bot_paths = []  # Reset bot paths
         
+        # Add built-in bots
+        bots_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', 'bots'))
         for filename, bot in self.available_bots.items():
             display_name = bot.name
+            full_path = os.path.join(bots_dir, filename)
             self.filename_to_display[display_name] = filename
+            self.bot_paths.append(full_path)
             self.bot_listbox.insert(tk.END, display_name)
 
     def schedule_tooltip(self, event):
@@ -628,21 +635,23 @@ class GameUI:
         except Exception as e:
             raise Exception(f"Failed to load bot: {str(e)}")
 
-    def start_tournament(self):
-        """Start a tournament with selected participants."""
-        selected_bots = self.get_selected_bots()
-        if len(selected_bots) < 2:
-            tk.messagebox.showerror("Error", "Please select at least 2 participants")
-            return
-
+    def start_tournament(self, selected_bot_paths, visualize=True):
+        """Start tournament with selected bots."""
+        tournament = TournamentSimulation()
         try:
-            # Create tournament simulator and run tournament
-            simulator = TournamentSimulation()
-            tournament_dir = simulator.run_all_against_all(selected_bots)
+            tournament_dir = tournament.run_all_against_all(selected_bot_paths, visualize=visualize)
             
-            # Force update the log with tournament results
-            self.update_log(self.read_latest_log("tournament"))
-            self.center_frame.update_idletasks()  # Force UI update
+            # Add a small delay to ensure files are written
+            self.parent.after(100)
+            
+            # Read and display tournament summary
+            self.log_text.delete(1.0, tk.END)
+            summary = self.read_latest_log("tournament")
+            if summary:
+                self.update_log(summary)
+            else:
+                self.log_text.insert(tk.END, "Error: Could not read tournament summary")
             
         except Exception as e:
-            tk.messagebox.showerror("Error", f"Tournament failed: {str(e)}")
+            self.log_text.delete(1.0, tk.END)
+            self.log_text.insert(tk.END, f"Error during tournament: {str(e)}\n")

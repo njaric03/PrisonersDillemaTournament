@@ -1,7 +1,9 @@
 import tkinter as tk
 from tkinter import ttk
+import os
 from interface.game_ui import GameUI
 from interface.menu_screen import MenuScreen
+from simulation.simulate_tournament import TournamentSimulation
 from .shared_style import Style
 
 class TournamentScreen:
@@ -84,6 +86,7 @@ class TournamentScreen:
         button_frame.grid_columnconfigure(0, weight=0)
         button_frame.grid_columnconfigure(1, weight=1)
         button_frame.grid_columnconfigure(2, weight=0)
+        button_frame.grid_columnconfigure(3, weight=0)
         
         # Back button on left with shared style
         back_btn = tk.Button(button_frame, 
@@ -92,12 +95,20 @@ class TournamentScreen:
                            **Style.button_style())
         back_btn.grid(row=0, column=0, padx=5)
         
+        # Add visualization checkbox
+        self.visualize_var = tk.BooleanVar(value=True)
+        visualize_cb = ttk.Checkbutton(button_frame, 
+                                     text="Show visualization",
+                                     variable=self.visualize_var,
+                                     style='Custom.TCheckbutton')
+        visualize_cb.grid(row=0, column=2, padx=5)
+        
         # Tournament button on right with shared style
         start_btn = tk.Button(button_frame,
                             text="Start Tournament",
                             command=self.start_tournament,
                             **Style.button_style())
-        start_btn.grid(row=0, column=2, padx=5)
+        start_btn.grid(row=0, column=3, padx=5)
         
         # Add hover effects
         for btn in [back_btn, start_btn]:
@@ -105,10 +116,41 @@ class TournamentScreen:
             btn.bind('<Leave>', lambda e, b=btn: b.configure(bg=Style.COLORS['button']))
         
     def start_tournament(self):
-        # Clear the log before starting new tournament
+        selected_indices = self.game_ui.bot_listbox.curselection()
+        if len(selected_indices) < 2:
+            self.game_ui.log_text.delete(1.0, tk.END)
+            self.game_ui.log_text.insert(tk.END, "Please select at least 2 bots for the tournament.\n")
+            return
+        
+        selected_bot_paths = self.game_ui.get_selected_bots()
         self.game_ui.log_text.delete(1.0, tk.END)
         self.game_ui.log_text.update_idletasks()
-        self.game_ui.start_tournament()
+        
+        # Start tournament and display summary in widget
+        tournament = TournamentSimulation()
+        try:
+            # Run tournament with visualization disabled
+            tournament_dir = tournament.run_all_against_all(selected_bot_paths, visualize=False)
+            
+            # Add delay to ensure files are written
+            self.root.after(100)
+            
+            # Read and display tournament summary
+            with open(os.path.join(tournament_dir, "tournament_summary.txt"), 'r') as f:
+                summary = f.read()
+                self.game_ui.update_log(summary)
+            
+            # Launch visualizer separately if checkbox is checked
+            if self.visualize_var.get():
+                from interface.tournament_visualizer import TournamentVisualizer
+                csv_path = os.path.join(tournament_dir, "results.csv")
+                visualizer = TournamentVisualizer(csv_path)
+                visualizer.animate_results(delay=1.0)
+                visualizer.show()
+                
+        except Exception as e:
+            self.game_ui.log_text.delete(1.0, tk.END)
+            self.game_ui.log_text.insert(tk.END, f"Error during tournament: {str(e)}\n")
 
     def back_to_menu(self):
         for widget in self.root.winfo_children():
