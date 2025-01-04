@@ -15,7 +15,7 @@ class GrudgeBot(AbstractBot):
     def description(self) -> str:
         return "A bot that never forgives betrayal"
     
-    def strategy(self, opponent_history: List[Move], current_round: int, total_rounds: int) -> Move:
+    def strategy(self, my_history: List[Move], opponent_history: List[Move], current_round: int, total_rounds: int) -> Move:
         if not opponent_history:
             return self.cooperate
             

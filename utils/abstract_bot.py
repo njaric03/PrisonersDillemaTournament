@@ -19,7 +19,7 @@ class AbstractBot(ABC):
         return ""  # Default empty description
     
     @abstractmethod
-    def strategy(self, opponent_history: List[Move], current_round: int, total_rounds: int) -> Move:
+    def strategy(self, my_history: List[Move], opponent_history: List[Move], current_round: int, total_rounds: int) -> Move:
         pass
     
     @property
@@ -33,7 +33,7 @@ class AbstractBot(ABC):
     def make_decision(self) -> Move:  # Remove total_rounds parameter
         """Make a decision based on strategy and history"""
         current_round = len(self.my_history) + 1
-        decision = self.strategy(self.opponent_history, current_round, self.total_rounds)
+        decision = self.strategy(self.my_history, self.opponent_history, current_round, self.total_rounds)
         return decision
         
     def update_history(self, my_move: Move, opponent_move: Move):

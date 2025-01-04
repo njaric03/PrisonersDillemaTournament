@@ -20,5 +20,5 @@ class PrimeBot(AbstractBot):
                 return False
         return True
     
-    def strategy(self, opponent_history: List[Move], current_round: int, total_rounds: int) -> Move:
+    def strategy(self, my_history: List[Move], opponent_history: List[Move], current_round: int, total_rounds: int) -> Move:
         return self.cooperate if self.is_prime(current_round) else self.defect

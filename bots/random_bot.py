@@ -12,5 +12,5 @@ class RandomBot(AbstractBot):
     def description(self) -> str:
         return "A bot that makes random decisions"
     
-    def strategy(self, opponent_history: List[Move], current_round: int, total_rounds: int) -> Move:
+    def strategy(self, my_history: List[Move], opponent_history: List[Move], current_round: int, total_rounds: int) -> Move:
         return random.choice([self.cooperate, self.defect])

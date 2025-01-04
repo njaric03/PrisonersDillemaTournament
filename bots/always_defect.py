@@ -11,5 +11,5 @@ class AlwaysDefectBot(AbstractBot):
     def description(self) -> str:
         return "A bot that always defects"
     
-    def strategy(self, opponent_history: List[Move], current_round: int, total_rounds: int) -> Move:
+    def strategy(self, my_history: List[Move], opponent_history: List[Move], current_round: int, total_rounds: int) -> Move:
         return self.defect
