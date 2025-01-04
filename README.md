@@ -4,7 +4,7 @@ Dobrodošli na blokadni turnir strategija! Ovaj dokument će vam pomoći da razu
 
 ## O turniru
 
-Zatvorenikova Dilema je klasičan primer iz teorije igara gde dva igrača moraju da odluče da li će sarađivati ili izdati jedan drugog. Na ovom turniru, vaš zadatak je da napišete bota koji će igrati protiv drugih botova i pokušati da ostvari najbolji mogući rezultat.
+Zatvorenikova dilema je klasičan primer iz teorije igara gde dva igrača moraju da odluče da li će sarađivati ili izdati jedan drugog. Na ovom turniru, vaš zadatak je da napišete bota koji će igrati protiv drugih botova i pokušati da ostvari najbolji mogući rezultat.
 
 ### Pravila bodovanja
 
@@ -116,7 +116,7 @@ python main.py
    - Pojedinačna strategija koja dobro radi protiv jednog protivnika možda nije optimalna za ceo turnir
 
 4. **Budite kreativni**: 
-   - Ne postoji "savršena" strategija
+   - Ne postoji optimalna strategija
    - Eksperimentišite sa različitim pristupima
    - Razmislite o tome kako da iskoristite informaciju o trenutnoj rundi
 
