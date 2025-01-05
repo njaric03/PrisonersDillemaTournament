@@ -86,7 +86,6 @@ class TournamentScreen:
         button_frame.grid_columnconfigure(0, weight=0)
         button_frame.grid_columnconfigure(1, weight=1)
         button_frame.grid_columnconfigure(2, weight=0)
-        button_frame.grid_columnconfigure(3, weight=0)
         
         # Back button on left with shared style
         back_btn = tk.Button(button_frame, 
@@ -95,20 +94,12 @@ class TournamentScreen:
                            **Style.button_style())
         back_btn.grid(row=0, column=0, padx=5)
         
-        # Add visualization checkbox
-        self.visualize_var = tk.BooleanVar(value=True)
-        visualize_cb = ttk.Checkbutton(button_frame, 
-                                     text="Show visualization",
-                                     variable=self.visualize_var,
-                                     style='Custom.TCheckbutton')
-        visualize_cb.grid(row=0, column=2, padx=5)
-        
         # Tournament button on right with shared style
         start_btn = tk.Button(button_frame,
                             text="Start Tournament",
                             command=self.start_tournament,
                             **Style.button_style())
-        start_btn.grid(row=0, column=3, padx=5)
+        start_btn.grid(row=0, column=2, padx=5)
         
         # Add hover effects
         for btn in [back_btn, start_btn]:
@@ -139,13 +130,6 @@ class TournamentScreen:
             with open(os.path.join(tournament_dir, "tournament_summary.txt"), 'r') as f:
                 summary = f.read()
                 self.game_ui.update_log(summary)
-            
-            # Launch visualizer separately if checkbox is checked
-            if self.visualize_var.get():
-                from interface.tournament_visualizer import TournamentVisualizer
-                csv_path = os.path.join(tournament_dir, "results.csv")
-                visualizer = TournamentVisualizer(csv_path)
-                visualizer.show()  # Remove animate_results call, only use show()
                 
         except Exception as e:
             self.game_ui.log_text.delete(1.0, tk.END)

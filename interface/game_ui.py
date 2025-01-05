@@ -35,6 +35,8 @@ class GameUI:
         self.player2_path = None
         self.player2_entry = None
         self.bot_paths = []  # Add bot_paths as instance variable
+        self.show_prebuilt = tk.BooleanVar(value=True)
+        self.show_custom = tk.BooleanVar(value=True)
         
         # Configure parent frame to expand
         parent.grid_rowconfigure(1, weight=1)  # Changed from 0 to 1 to match the content row
@@ -195,6 +197,26 @@ class GameUI:
                     command=self.toggle_select_all)
                 select_all_btn.pack(pady=(5,0), anchor="w")
             
+            # Add filter checkboxes before the listbox
+            filter_frame = ttk.Frame(self.right_frame, style='Custom.TFrame')
+            filter_frame.pack(fill=tk.X, pady=(0, 5))
+            
+            prebuilt_check = ttk.Checkbutton(
+                filter_frame,
+                text="Show Prebuilt Bots",
+                variable=self.show_prebuilt,
+                style='Custom.TCheckbutton',
+                command=self.filter_bots)
+            prebuilt_check.pack(side=tk.LEFT, padx=5)
+            
+            custom_check = ttk.Checkbutton(
+                filter_frame,
+                text="Show Custom Bots",
+                variable=self.show_custom,
+                style='Custom.TCheckbutton',
+                command=self.filter_bots)
+            custom_check.pack(side=tk.LEFT, padx=5)
+            
             self.bot_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
             scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
             
@@ -299,9 +321,40 @@ class GameUI:
         listbox_frame = ttk.Frame(self.right_frame, style='Custom.TFrame')
         listbox_frame.pack(fill=tk.BOTH, expand=True)
         
-        # First create the listbox
+        # First create select all checkbox if in multiple/tournament mode
+        if self.mode != "game":
+            self.select_all_var = tk.BooleanVar()
+            select_all_btn = ttk.Checkbutton(
+                self.right_frame,
+                text="Select All",
+                variable=self.select_all_var,
+                style='Custom.TCheckbutton',
+                command=self.toggle_select_all)
+            select_all_btn.pack(pady=(5,0), anchor="w")
+
+        # Add filter checkboxes before the listbox
+        filter_frame = ttk.Frame(self.right_frame, style='Custom.TFrame')
+        filter_frame.pack(fill=tk.X, pady=(0, 5))
+        
+        prebuilt_check = ttk.Checkbutton(
+            filter_frame,
+            text="Show Prebuilt Bots",
+            variable=self.show_prebuilt,
+            style='Custom.TCheckbutton',
+            command=self.filter_bots)
+        prebuilt_check.pack(side=tk.LEFT, padx=5)
+        
+        custom_check = ttk.Checkbutton(
+            filter_frame,
+            text="Show Custom Bots",
+            variable=self.show_custom,
+            style='Custom.TCheckbutton',
+            command=self.filter_bots)
+        custom_check.pack(side=tk.LEFT, padx=5)
+        
+        # Create the listbox
         self.bot_listbox = tk.Listbox(listbox_frame,
-                                     selectmode=tk.MULTIPLE,
+                                     selectmode=tk.SINGLE if self.mode == "game" else tk.MULTIPLE,
                                      bg=Style.COLORS['button'],
                                      fg=Style.COLORS['text'],
                                      font=Style.FONTS['text'],
@@ -313,17 +366,7 @@ class GameUI:
                                 command=self.bot_listbox.yview)
         self.bot_listbox.configure(yscrollcommand=scrollbar.set)
         
-        # Then create the Select All checkbox
-        self.select_all_var = tk.BooleanVar()
-        select_all_btn = ttk.Checkbutton(
-            self.right_frame,
-            text="Select All",
-            variable=self.select_all_var,
-            style='Custom.TCheckbutton',
-            command=self.toggle_select_all)
-        select_all_btn.pack(pady=(5,0), anchor="w")
-        
-        # Now pack the listbox and scrollbar
+        # Pack listbox and scrollbar
         self.bot_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
@@ -377,7 +420,8 @@ class GameUI:
                     display_name = f"{bot_instance.name} (Custom)"
                     self.filename_to_display[display_name] = filepath
                     self.bot_paths.append(filepath)  # Add to bot paths
-                    self.bot_listbox.insert(tk.END, display_name)
+                    if self.show_custom.get():  # Only add to listbox if custom bots are shown
+                        self.bot_listbox.insert(tk.END, display_name)
                 else:
                     messagebox.showerror("Error", "No valid bot class found in file")
             except Exception as e:
@@ -418,19 +462,28 @@ class GameUI:
             self.player1_path.set(filename)
 
     def load_bots(self):
-        """Dynamically load bot classes from the bots directory"""
-        bots = {}
+        """Load bot classes from the bots directory and its immediate subfolders"""
+        bots = {'prebuilt': {}, 'user_created': {}}
         bots_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', 'bots'))
         
         if not os.path.exists(bots_dir):
             os.makedirs(bots_dir)
             return bots
-            
-        for filename in os.listdir(bots_dir):
-            if filename.endswith('.py') and not filename.startswith('__'):
-                filepath = os.path.normpath(os.path.join(bots_dir, filename))
+
+        # Process prebuilt and user-created directories
+        prebuilt_dir = os.path.join(bots_dir, 'prebuilt')
+        user_created_dir = os.path.join(bots_dir, 'user-created')
+        
+        # Create directories if they don't exist
+        for directory in [prebuilt_dir, user_created_dir]:
+            if not os.path.exists(directory):
+                os.makedirs(directory)
+
+        # Load bots from each directory
+        for entry in os.scandir(prebuilt_dir):
+            if entry.is_file() and entry.name.endswith('.py') and not entry.name.startswith('__'):
                 try:
-                    spec = importlib.util.spec_from_file_location(filename[:-3], filepath)
+                    spec = importlib.util.spec_from_file_location(entry.name[:-3], entry.path)
                     module = importlib.util.module_from_spec(spec)
                     spec.loader.exec_module(module)
                     
@@ -438,27 +491,73 @@ class GameUI:
                         obj = getattr(module, item)
                         if isinstance(obj, type) and issubclass(obj, AbstractBot) and obj != AbstractBot:
                             bot_instance = obj()
-                            bots[filename] = bot_instance
+                            rel_path = os.path.relpath(entry.path, bots_dir)
+                            bots['prebuilt'][rel_path] = bot_instance
                             break
                 except Exception as e:
                     continue
+
+        # Load user-created bots
+        for entry in os.scandir(user_created_dir):
+            if entry.is_file() and entry.name.endswith('.py') and not entry.name.startswith('__'):
+                try:
+                    spec = importlib.util.spec_from_file_location(entry.name[:-3], entry.path)
+                    module = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(module)
                     
+                    for item in dir(module):
+                        obj = getattr(module, item)
+                        if isinstance(obj, type) and issubclass(obj, AbstractBot) and obj != AbstractBot:
+                            bot_instance = obj()
+                            rel_path = os.path.relpath(entry.path, bots_dir)
+                            bots['user_created'][rel_path] = bot_instance
+                            break
+                except Exception as e:
+                    continue
+        
         return bots
 
     def update_bot_dropdown(self):
         """Update listbox with bot names and maintain bot paths"""
         self.bot_listbox.delete(0, tk.END)
         self.filename_to_display = {}
-        self.bot_paths = []  # Reset bot paths
+        self.bot_paths = []
         
-        # Add built-in bots
+        # Load bots based on filter settings
+        self.filter_bots()
+
+    def filter_bots(self):
+        """Filter bots based on checkbox settings"""
+        self.bot_listbox.delete(0, tk.END)
+        self.filename_to_display.clear()
+        self.bot_paths.clear()
+        
         bots_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', 'bots'))
-        for filename, bot in self.available_bots.items():
-            display_name = bot.name
-            full_path = os.path.join(bots_dir, filename)
-            self.filename_to_display[display_name] = filename
-            self.bot_paths.append(full_path)
-            self.bot_listbox.insert(tk.END, display_name)
+        
+        # Show prebuilt bots
+        if self.show_prebuilt.get():
+            for rel_path, bot in self.available_bots['prebuilt'].items():
+                display_name = bot.name
+                full_path = os.path.join(bots_dir, rel_path)
+                self.filename_to_display[display_name] = rel_path
+                self.bot_paths.append(full_path)
+                self.bot_listbox.insert(tk.END, display_name)
+        
+        # Show user-created bots (including your_bot.py)
+        if self.show_custom.get():
+            # Add bots from user-created folder
+            for rel_path, bot in self.available_bots['user_created'].items():
+                display_name = f"{bot.name} (User)"
+                full_path = os.path.join(bots_dir, rel_path)
+                self.filename_to_display[display_name] = rel_path
+                self.bot_paths.append(full_path)
+                self.bot_listbox.insert(tk.END, display_name)
+            
+            # Add custom bots added during runtime
+            for display_name, filepath in list(self.filename_to_display.items()):
+                if "(Custom)" in display_name:
+                    self.bot_listbox.insert(tk.END, display_name)
+                    self.bot_paths.append(filepath)
 
     def schedule_tooltip(self, event):
         # Get the item under cursor

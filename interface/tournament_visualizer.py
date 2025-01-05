@@ -5,6 +5,10 @@ from .shared_style import Style
 
 class TournamentVisualizer:
     def __init__(self, csv_path):
+        self.PLACE_WIDTH = 150
+        self.BOT_WIDTH = 500
+        self.SCORE_WIDTH = 150
+        
         self.df = pd.read_csv(csv_path)
         self.df = self.df.sort_values('Average', ascending=False)
         self.current_index = 0
@@ -13,6 +17,27 @@ class TournamentVisualizer:
         self.root.title("Tournament Results")
         self.root.state('zoomed')
         self.root.configure(bg=Style.COLORS['bg'])  # Add background to root
+        
+        # Create persistent header frame (outside scrollable area)
+        header_frame = tk.Frame(self.root, bg=Style.COLORS['bg'])
+        header_frame.pack(fill='x', padx=20, pady=(20,0))
+        
+        # Configure header columns with fixed widths
+        place_header = tk.Frame(header_frame, width=self.PLACE_WIDTH, bg=Style.COLORS['bg'])
+        bot_header = tk.Frame(header_frame, width=self.BOT_WIDTH, bg=Style.COLORS['bg'])
+        score_header = tk.Frame(header_frame, width=self.SCORE_WIDTH, bg=Style.COLORS['bg'])
+        
+        place_header.pack(side='left', padx=(0,20))
+        bot_header.pack(side='left', padx=20, expand=True, fill='x')
+        score_header.pack(side='right', padx=20)
+        
+        # Add header labels
+        tk.Label(place_header, text="Place", font=Style.FONTS['heading'], 
+                bg=Style.COLORS['bg'], fg=Style.COLORS['text']).pack(anchor='w')
+        tk.Label(bot_header, text="Bot", font=Style.FONTS['heading'], 
+                bg=Style.COLORS['bg'], fg=Style.COLORS['text']).pack(anchor='center', padx=(100, 0))  # Changed anchor and added left padding
+        tk.Label(score_header, text="Score", font=Style.FONTS['heading'],
+                bg=Style.COLORS['bg'], fg=Style.COLORS['text']).pack(anchor='e')
         
         # Create scrollable canvas
         self.canvas = tk.Canvas(self.root, bg=Style.COLORS['bg'], 
@@ -25,7 +50,7 @@ class TournamentVisualizer:
         
         # Pack scrollbar and canvas
         scrollbar.pack(side="right", fill="y")
-        self.canvas.pack(side="left", fill="both", expand=True, padx=20, pady=20)
+        self.canvas.pack(side="left", fill="both", expand=True, padx=20, pady=(0,20))
         
         # Create main container inside canvas
         self.container = tk.Frame(self.canvas, bg=Style.COLORS['bg'])
@@ -35,17 +60,6 @@ class TournamentVisualizer:
         self.container.grid_columnconfigure(0, weight=1)  # Place number
         self.container.grid_columnconfigure(1, weight=3)  # Bot column gets more space
         self.container.grid_columnconfigure(2, weight=1)  # Score column gets less space
-        
-        # Create header with grid
-        header_frame = tk.Frame(self.container, bg=Style.COLORS['bg'])
-        header_frame.grid(row=0, column=0, columnspan=3, sticky='ew', pady=(0, 20))
-        
-        tk.Label(header_frame, text="Place", font=Style.FONTS['heading'], 
-                bg=Style.COLORS['bg'], fg=Style.COLORS['text']).pack(side='left', padx=20)
-        tk.Label(header_frame, text="Bot", font=Style.FONTS['heading'], 
-                bg=Style.COLORS['bg'], fg=Style.COLORS['text']).pack(side='left', padx=20)
-        tk.Label(header_frame, text="Score", font=Style.FONTS['heading'],
-                bg=Style.COLORS['bg'], fg=Style.COLORS['text']).pack(side='right', padx=20)
         
         # Create row frames using grid
         self.rows = []
@@ -59,14 +73,10 @@ class TournamentVisualizer:
             frame.grid_propagate(False)
             
             # Create place label with medals for top 3
-            if index == 0:
-                place_text = "🥇"
-            elif index == 1:
-                place_text = "🥈"
-            elif index == 2:
-                place_text = "🥉"
-            else:
-                place_text = f"#{index + 1}"
+            if index == 0: place_text = "🥇"
+            elif index == 1: place_text = "🥈"
+            elif index == 2: place_text = "🥉"
+            else: place_text = f"#{index + 1}"
                 
             place_label = tk.Label(frame, text=place_text,
                                  font=Style.FONTS['heading'], 
@@ -110,13 +120,13 @@ class TournamentVisualizer:
             position = len(self.df) - self.current_index - 1
             if position == 0:  # First place
                 bg_color = '#FFD700'  # Gold
-                font_size = 56
+                font_size = 40  # All top 3 use same larger font size
             elif position == 1:  # Second place
                 bg_color = '#C0C0C0'  # Silver
-                font_size = 48
+                font_size = 40  # Same as first place
             elif position == 2:  # Third place
                 bg_color = '#B8860B'  # DarkGoldenRod
-                font_size = 40
+                font_size = 40  # Same as first place
             else:
                 bg_color = Style.COLORS['button']
                 font_size = 32
