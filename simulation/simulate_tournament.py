@@ -5,11 +5,18 @@ from utils.moves import Move
 from utils.game_config import GameConfig
 import importlib.util
 import random
+import pandas as pd
 
 class TournamentSimulation:
     def __init__(self):
         self.logs_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'logs')
         os.makedirs(self.logs_dir, exist_ok=True)
+
+    def clean_bot_name(self, path):
+        """Extract clean bot name from path"""
+        name = os.path.basename(path).replace('.py', '')
+        name = name.lower().replace(' ', '_')  # Normalize to lowercase with underscores
+        return name
 
     def load_bot(self, bot_path):
         """Load a bot from a file path."""
@@ -21,10 +28,25 @@ class TournamentSimulation:
             for item in dir(module):
                 obj = getattr(module, item)
                 if isinstance(obj, type) and issubclass(obj, AbstractBot) and obj != AbstractBot:
-                    return obj()
+                    bot = obj()
+                    display_name = self.clean_bot_name(bot_path)
+                    # Store original name and set display name
+                    original_name = bot.name
+                    bot._name = display_name  # Set internal name directly
+                    return bot, display_name
             raise ValueError("No valid bot class found in file")
         except Exception as e:
             raise Exception(f"Failed to load bot: {str(e)}")
+
+    def normalize_scores(self, scores):
+        """Normalize scores to 200-1000 range (800 point spread + 200 base)"""
+        if len(scores) == 0:
+            return []
+        min_score = min(scores)
+        max_score = max(scores)
+        if max_score == min_score:
+            return [1000 if s > 0 else 200 for s in scores]
+        return [200 + ((s - min_score) * 800 / (max_score - min_score)) for s in scores]
 
     def run_all_against_all(self, bot_paths, rounds=GameConfig.NUMBER_OF_ROUNDS, visualize=False):
         """Conduct a round-robin tournament where each bot plays against each other.
@@ -52,20 +74,20 @@ class TournamentSimulation:
 
         # Run matches between all pairs of bots
         for i, bot1_path in enumerate(bot_paths):
-            bot1 = self.load_bot(bot1_path)
-            stats['betrayals'][bot1.name] = 0
+            bot1, bot1_name = self.load_bot(bot1_path)
+            stats['betrayals'][bot1_name] = 0
             
             for j, bot2_path in enumerate(bot_paths[i+1:], i+1):
-                bot2 = self.load_bot(bot2_path)
+                bot2, bot2_name = self.load_bot(bot2_path)
                 if j == i: continue  # Skip self-play
                 
-                if bot2.name not in stats['betrayals']:
-                    stats['betrayals'][bot2.name] = 0
+                if bot2_name not in stats['betrayals']:
+                    stats['betrayals'][bot2_name] = 0
 
                 # Initialize scores if needed
-                for bot_name in [bot1.name, bot2.name]:
-                    scores.setdefault(bot_name, 0)
-                    matches_played.setdefault(bot_name, 0)
+                for name in [bot1_name, bot2_name]:
+                    scores.setdefault(name, 0)
+                    matches_played.setdefault(name, 0)
 
                 # Calculate rounds for this match while maintaining total
                 if GameConfig.ADD_NOISE:
@@ -98,19 +120,19 @@ class TournamentSimulation:
                 remaining_rounds[bot1_path] -= match_rounds
                 remaining_rounds[bot2_path] -= match_rounds
 
-                # Run match
-                match_stats = self._run_match(bot1, bot2, match_rounds, tournament_dir)
+                # Run match with display names
+                match_stats = self._run_match(bot1, bot2, match_rounds, tournament_dir, bot1_name, bot2_name)
                 
-                # Update scores and statistics
-                scores[bot1.name] += match_stats['scores'][bot1.name]
-                scores[bot2.name] += match_stats['scores'][bot2.name]
-                matches_played[bot1.name] += 1
-                matches_played[bot2.name] += 1
+                # Update scores and statistics using display names
+                scores[bot1_name] += match_stats['scores'][bot1_name]
+                scores[bot2_name] += match_stats['scores'][bot2_name]
+                matches_played[bot1_name] += 1
+                matches_played[bot2_name] += 1
                 
                 stats['mutual_cooperation'] += match_stats['mutual_cooperation']
                 stats['mutual_defection'] += match_stats['mutual_defection']
-                stats['betrayals'][bot1.name] += match_stats['betrayals'][bot1.name]
-                stats['betrayals'][bot2.name] += match_stats['betrayals'][bot2.name]
+                stats['betrayals'][bot1_name] += match_stats['betrayals'][bot1_name]
+                stats['betrayals'][bot2_name] += match_stats['betrayals'][bot2_name]
 
         # Verify all bots played their expected number of rounds
         for bot_path, remaining in remaining_rounds.items():
@@ -154,15 +176,40 @@ class TournamentSimulation:
         self._write_tournament_summary(tournament_dir, scores, stats, matches_played, rounds, bot_names, display_names, score_matrix)
         self._export_score_matrix_csv(directory=tournament_dir, bot_names=bot_names, display_names=display_names, score_matrix=score_matrix)
         
+        # After calculating averages but before saving to CSV:
+        bot_names = [self.clean_bot_name(path) for path in bot_paths]
+        avg_scores = []
+        
+        for bot in bot_names:
+            total = sum(score_matrix[bot][opponent] for opponent in bot_names if opponent != bot)
+            matches = len(bot_names) - 1
+            avg_scores.append(total / matches)
+
+        normalized_scores = self.normalize_scores(avg_scores)
+        
+        # Create DataFrame with both original and normalized scores
+        df = pd.DataFrame({
+            'Bot': bot_names,
+            'Average': avg_scores,
+            'Normalized': normalized_scores
+        })
+        
+        # Add individual matchup results
+        for bot in bot_names:
+            df[bot] = pd.Series([score_matrix[bot][opponent] if bot != opponent else None for opponent in bot_names])
+        
+        df = df.sort_values('Average', ascending=False)
+        df.to_csv(os.path.join(tournament_dir, "results.csv"), index=False)
+        
         return tournament_dir
 
-    def _run_match(self, bot1, bot2, rounds, tournament_dir):
+    def _run_match(self, bot1, bot2, rounds, tournament_dir, bot1_name, bot2_name):
         """Run a single match between two bots and return match statistics."""
-        scores = {bot1.name: 0, bot2.name: 0}
+        scores = {bot1_name: 0, bot2_name: 0}
         stats = {
             'mutual_cooperation': 0,
             'mutual_defection': 0,
-            'betrayals': {bot1.name: 0, bot2.name: 0}
+            'betrayals': {bot1_name: 0, bot2_name: 0}
         }
         
         # Reset bot histories at start of match
@@ -175,8 +222,8 @@ class TournamentSimulation:
         output_lines = [
             "="*50,
             f"MATCH RESULTS - {datetime.now().strftime('%Y-%m-%d %H:%M')}",
-            f"Bot 1: {bot1.name}",
-            f"Bot 2: {bot2.name}",
+            f"Bot 1: {bot1_name}",
+            f"Bot 2: {bot2_name}",
             "="*50,
             "",
             "ROUND HISTORY:",
@@ -199,26 +246,26 @@ class TournamentSimulation:
             # Calculate round result and update scores
             if move1 == Move.COOPERATE and move2 == Move.COOPERATE:
                 round_result = f"{GameConfig.MUTUAL_COOPERATION_POINTS:^2} - {GameConfig.MUTUAL_COOPERATION_POINTS:^2}"
-                scores[bot1.name] += GameConfig.MUTUAL_COOPERATION_POINTS
-                scores[bot2.name] += GameConfig.MUTUAL_COOPERATION_POINTS
+                scores[bot1_name] += GameConfig.MUTUAL_COOPERATION_POINTS
+                scores[bot2_name] += GameConfig.MUTUAL_COOPERATION_POINTS
                 stats['mutual_cooperation'] += 1
             elif move1 == Move.COOPERATE and move2 == Move.DEFECT:
                 round_result = f"{GameConfig.BETRAYED_POINTS:^2} - {GameConfig.BETRAYAL_POINTS:^2}"
-                scores[bot1.name] += GameConfig.BETRAYED_POINTS
-                scores[bot2.name] += GameConfig.BETRAYAL_POINTS
-                stats['betrayals'][bot2.name] += 1
+                scores[bot1_name] += GameConfig.BETRAYED_POINTS
+                scores[bot2_name] += GameConfig.BETRAYAL_POINTS
+                stats['betrayals'][bot2_name] += 1
             elif move1 == Move.DEFECT and move2 == Move.COOPERATE:
                 round_result = f"{GameConfig.BETRAYAL_POINTS:^2} - {GameConfig.BETRAYED_POINTS:^2}"
-                scores[bot1.name] += GameConfig.BETRAYAL_POINTS
-                scores[bot2.name] += GameConfig.BETRAYED_POINTS
-                stats['betrayals'][bot1.name] += 1
+                scores[bot1_name] += GameConfig.BETRAYAL_POINTS
+                scores[bot2_name] += GameConfig.BETRAYED_POINTS
+                stats['betrayals'][bot1_name] += 1
             else:  # Both defect
                 round_result = f"{GameConfig.MUTUAL_DEFECTION_POINTS:^2} - {GameConfig.MUTUAL_DEFECTION_POINTS:^2}"
-                scores[bot1.name] += GameConfig.MUTUAL_DEFECTION_POINTS
-                scores[bot2.name] += GameConfig.MUTUAL_DEFECTION_POINTS
+                scores[bot1_name] += GameConfig.MUTUAL_DEFECTION_POINTS
+                scores[bot2_name] += GameConfig.MUTUAL_DEFECTION_POINTS
                 stats['mutual_defection'] += 1
                 
-            current_score = f"{scores[bot1.name]:^5} - {scores[bot2.name]:^5}"
+            current_score = f"{scores[bot1_name]:^5} - {scores[bot2_name]:^5}"
             output_lines.append(f"{round_num+1:^6} | {move1.name:^10} | {move2.name:^10} | {round_result:^12} | {current_score}")
         
         # Add final statistics
@@ -228,18 +275,18 @@ class TournamentSimulation:
             f"Total Rounds: {rounds}",
             f"Mutual Cooperation: {stats['mutual_cooperation']} ({stats['mutual_cooperation']/rounds*100:.1f}%)",
             f"Mutual Defection: {stats['mutual_defection']} ({stats['mutual_defection']/rounds*100:.1f}%)",
-            f"Betrayals by {bot1.name}: {stats['betrayals'][bot1.name]} ({stats['betrayals'][bot1.name]/rounds*100:.1f}%)",
-            f"Betrayals by {bot2.name}: {stats['betrayals'][bot2.name]} ({stats['betrayals'][bot2.name]/rounds*100:.1f}%)",
+            f"Betrayals by {bot1_name}: {stats['betrayals'][bot1_name]} ({stats['betrayals'][bot1_name]/rounds*100:.1f}%)",
+            f"Betrayals by {bot2_name}: {stats['betrayals'][bot2_name]} ({stats['betrayals'][bot2_name]/rounds*100:.1f}%)",
             "",
             "FINAL SCORES:",
             "-"*50,
-            f"{bot1.name}: {scores[bot1.name]}",
-            f"{bot2.name}: {scores[bot2.name]}",
+            f"{bot1_name}: {scores[bot1_name]}",
+            f"{bot2_name}: {scores[bot2_name]}",
             "="*50
         ])
         
         # Write match results to file
-        match_file = os.path.join(tournament_dir, f"{bot1.name}_vs_{bot2.name}.txt")
+        match_file = os.path.join(tournament_dir, f"{bot1_name}_vs_{bot2_name}.txt")
         with open(match_file, 'w') as f:
             f.write('\n'.join(output_lines))
         
@@ -354,7 +401,7 @@ class TournamentSimulation:
         csv_path = os.path.join(directory, "results.csv")
         with open(csv_path, 'w') as f:
             # Write header row
-            f.write("Bot," + ",".join([display_names[bot] for bot in bot_names]) + ",Average\n")
+            f.write("Bot," + ",".join([display_names[bot] for bot in bot_names]) + ",Average,Normalized\n")
             
             # Write data rows using actual match scores
             for bot1 in bot_names:
@@ -374,5 +421,9 @@ class TournamentSimulation:
                 # Calculate and append average
                 avg_score = total_score / matches if matches > 0 else 0
                 row.append(f"{avg_score:.1f}")
+                
+                # Calculate and append normalized score
+                normalized_score = self.normalize_scores([avg_score])[0]
+                row.append(f"{normalized_score:.1f}")
                 
                 f.write(",".join(row) + "\n")

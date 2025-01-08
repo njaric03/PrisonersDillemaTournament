@@ -5,6 +5,7 @@ from interface.game_ui import GameUI
 from interface.menu_screen import MenuScreen
 from simulation.simulate_tournament import TournamentSimulation
 from .shared_style import Style
+from interface.tournament_visualizer import TournamentVisualizer
 
 class TournamentScreen:
     def __init__(self, root):
@@ -109,31 +110,49 @@ class TournamentScreen:
     def start_tournament(self):
         selected_indices = self.game_ui.bot_listbox.curselection()
         if len(selected_indices) < 2:
-            self.game_ui.log_text.delete(1.0, tk.END)
-            self.game_ui.log_text.insert(tk.END, "Please select at least 2 bots for the tournament.\n")
+            try:
+                self.game_ui.log_text.delete(1.0, tk.END)
+                self.game_ui.log_text.insert(tk.END, "Please select at least 2 bots for the tournament.\n")
+            except tk.TclError:
+                # Text widget was destroyed, create new one
+                return
             return
         
         selected_bot_paths = self.game_ui.get_selected_bots()
-        self.game_ui.log_text.delete(1.0, tk.END)
-        self.game_ui.log_text.update_idletasks()
+        try:
+            self.game_ui.log_text.delete(1.0, tk.END)
+            self.game_ui.log_text.update_idletasks()
+        except tk.TclError:
+            pass
         
         # Start tournament and display summary in widget
         tournament = TournamentSimulation()
         try:
-            # Run tournament with visualization disabled
-            tournament_dir = tournament.run_all_against_all(selected_bot_paths, visualize=False)
+            # Run tournament with visualization enabled
+            tournament_dir = tournament.run_all_against_all(selected_bot_paths, visualize=True)
             
             # Add delay to ensure files are written
             self.root.after(100)
             
+            # Show tournament visualization
+            visualizer = TournamentVisualizer(os.path.join(tournament_dir, "results.csv"))
+            visualizer.show()
+            
             # Read and display tournament summary
             with open(os.path.join(tournament_dir, "tournament_summary.txt"), 'r') as f:
                 summary = f.read()
-                self.game_ui.update_log(summary)
+                try:
+                    self.game_ui.update_log(summary)
+                except tk.TclError:
+                    # Widget was destroyed, ignore
+                    pass
                 
         except Exception as e:
-            self.game_ui.log_text.delete(1.0, tk.END)
-            self.game_ui.log_text.insert(tk.END, f"Error during tournament: {str(e)}\n")
+            try:
+                self.game_ui.log_text.delete(1.0, tk.END)
+                self.game_ui.log_text.insert(tk.END, f"Error during tournament: {str(e)}\n")
+            except tk.TclError:
+                print(f"Error during tournament: {str(e)}")
 
     def back_to_menu(self):
         for widget in self.root.winfo_children():

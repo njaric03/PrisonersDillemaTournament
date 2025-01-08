@@ -8,9 +8,14 @@ class TournamentVisualizer:
         self.PLACE_WIDTH = 150
         self.BOT_WIDTH = 500
         self.SCORE_WIDTH = 150
+        self.NORMALIZED_WIDTH = 200  # Add width for normalized score column
         
         self.df = pd.read_csv(csv_path)
-        self.df = self.df.sort_values('Average', ascending=False)
+        
+        # Clean bot names for display
+        self.df['Bot'] = self.df['Bot'].apply(lambda x: x.replace('_', ' ').title())
+        
+        self.df = self.df.sort_values('Normalized', ascending=False)  # Sort by normalized scores
         self.current_index = 0
         
         self.root = tk.Toplevel()  # Changed from Tk() to Toplevel()
@@ -26,17 +31,21 @@ class TournamentVisualizer:
         place_header = tk.Frame(header_frame, width=self.PLACE_WIDTH, bg=Style.COLORS['bg'])
         bot_header = tk.Frame(header_frame, width=self.BOT_WIDTH, bg=Style.COLORS['bg'])
         score_header = tk.Frame(header_frame, width=self.SCORE_WIDTH, bg=Style.COLORS['bg'])
+        normalized_header = tk.Frame(header_frame, width=self.NORMALIZED_WIDTH, bg=Style.COLORS['bg'])
         
         place_header.pack(side='left', padx=(0,20))
         bot_header.pack(side='left', padx=20, expand=True, fill='x')
-        score_header.pack(side='right', padx=20)
+        score_header.pack(side='left', padx=20)
+        normalized_header.pack(side='right', padx=20)
         
         # Add header labels
         tk.Label(place_header, text="Place", font=Style.FONTS['heading'], 
                 bg=Style.COLORS['bg'], fg=Style.COLORS['text']).pack(anchor='w')
         tk.Label(bot_header, text="Bot", font=Style.FONTS['heading'], 
                 bg=Style.COLORS['bg'], fg=Style.COLORS['text']).pack(anchor='center', padx=(100, 0))  # Changed anchor and added left padding
-        tk.Label(score_header, text="Score", font=Style.FONTS['heading'],
+        tk.Label(score_header, text="Average", font=Style.FONTS['heading'],
+                bg=Style.COLORS['bg'], fg=Style.COLORS['text']).pack(anchor='e')
+        tk.Label(normalized_header, text="Normalized Score", font=Style.FONTS['heading'],
                 bg=Style.COLORS['bg'], fg=Style.COLORS['text']).pack(anchor='e')
         
         # Create scrollable canvas
@@ -60,16 +69,18 @@ class TournamentVisualizer:
         self.container.grid_columnconfigure(0, weight=1)  # Place number
         self.container.grid_columnconfigure(1, weight=3)  # Bot column gets more space
         self.container.grid_columnconfigure(2, weight=1)  # Score column gets less space
+        self.container.grid_columnconfigure(3, weight=1)  # Normalized score column
         
         # Create row frames using grid
         self.rows = []
         for index in range(len(self.df)):
             row = self.df.iloc[index]
             frame = tk.Frame(self.container, height=150, bg=Style.COLORS['bg'])
-            frame.grid(row=index+1, column=0, columnspan=3, sticky='ew', pady=5)
+            frame.grid(row=index+1, column=0, columnspan=4, sticky='ew', pady=5)  # Changed columnspan to 4
             frame.grid_columnconfigure(0, weight=1)  # Place number
             frame.grid_columnconfigure(1, weight=3)  # Bot name
-            frame.grid_columnconfigure(2, weight=1)  # Score
+            frame.grid_columnconfigure(2, weight=1)  # Average score
+            frame.grid_columnconfigure(3, weight=1)  # Normalized score
             frame.grid_propagate(False)
             
             # Create place label with medals for top 3
@@ -90,13 +101,19 @@ class TournamentVisualizer:
                                fg=Style.COLORS['bg'])
             bot_label.grid(row=0, column=1, sticky='w', padx=20)
             
-            score_label = tk.Label(frame, text=f"{row['Average']:.2f}", 
-                                 font=Style.FONTS['heading'],
-                                 bg=Style.COLORS['bg'], 
-                                 fg=Style.COLORS['bg'])
-            score_label.grid(row=0, column=2, sticky='e', padx=20)
+            avg_score_label = tk.Label(frame, text=f"{row['Average']:.1f}",
+                                     font=Style.FONTS['heading'],
+                                     bg=Style.COLORS['bg'], 
+                                     fg=Style.COLORS['bg'])
+            avg_score_label.grid(row=0, column=2, sticky='e', padx=20)
             
-            self.rows.append((frame, place_label, bot_label, score_label))
+            norm_score_label = tk.Label(frame, text=f"{row['Normalized']:.1f}",
+                                      font=Style.FONTS['heading'],
+                                      bg=Style.COLORS['bg'], 
+                                      fg=Style.COLORS['bg'])
+            norm_score_label.grid(row=0, column=3, sticky='e', padx=20)
+            
+            self.rows.append((frame, place_label, bot_label, avg_score_label, norm_score_label))
         
         # Configure scrolling
         self.container.bind('<Configure>', self._configure_canvas)
@@ -114,7 +131,7 @@ class TournamentVisualizer:
 
     def reveal_next(self, event):
         if self.current_index < len(self.df):
-            frame, place_label, bot_label, score_label = self.rows[-(self.current_index + 1)]
+            frame, place_label, bot_label, avg_score_label, norm_score_label = self.rows[-(self.current_index + 1)]
             
             # Configure colors based on position with themed colors
             position = len(self.df) - self.current_index - 1
@@ -136,8 +153,10 @@ class TournamentVisualizer:
                                 font=('Arial', font_size, 'bold'))
             bot_label.configure(bg=bg_color, fg=Style.COLORS['text'], 
                               font=('Arial', font_size, 'bold'))
-            score_label.configure(bg=bg_color, fg=Style.COLORS['text'], 
-                                font=('Arial', font_size, 'bold'))
+            avg_score_label.configure(bg=bg_color, fg=Style.COLORS['text'], 
+                                    font=('Arial', font_size, 'bold'))
+            norm_score_label.configure(bg=bg_color, fg=Style.COLORS['text'], 
+                                     font=('Arial', font_size, 'bold'))
             
             # Scroll revealed row to top
             self.root.update_idletasks()

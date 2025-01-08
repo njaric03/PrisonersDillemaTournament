@@ -5,6 +5,7 @@ from typing import List
 
 class AbstractBot(ABC):
     def __init__(self):
+        self._name = ""
         self.my_history = []
         self.opponent_history = []
         self.total_rounds = GameConfig.NUMBER_OF_ROUNDS
@@ -12,7 +13,11 @@ class AbstractBot(ABC):
     @property
     @abstractmethod
     def name(self) -> str:
-        pass
+        return self._name
+    
+    @name.setter
+    def name(self, value: str):
+        self._name = value
     
     @property
     def description(self) -> str:

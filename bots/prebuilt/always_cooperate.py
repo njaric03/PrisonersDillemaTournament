@@ -3,9 +3,13 @@ from utils.moves import Move
 from typing import List
 
 class AlwaysCooperateBot(AbstractBot):
+    def __init__(self):
+        super().__init__()
+        self._name = "Always Cooperate Bot"
+    
     @property
     def name(self) -> str:
-        return "Always Cooperate Bot"
+        return self._name
     
     @property
     def description(self) -> str:
