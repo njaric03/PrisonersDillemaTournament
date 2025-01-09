@@ -70,7 +70,7 @@ class PametniBot(AbstractBot):
         elif current_round < total_rounds * 0.75:
             # Ako protivnik često izdaje (>30%), uzvraćamo istom merom
             if betrayal_rate > 0.3:
-                return Move.BETRAY
+                return Move.DEFECT
             # Ako je protivnik uglavnom fer, sarađujemo
             return Move.COOPERATE
             
@@ -80,7 +80,7 @@ class PametniBot(AbstractBot):
             recent_moves = opponent_history[-3:]
             # Ako je nedavno izdao, uzvraćamo
             if Move.BETRAY in recent_moves:
-                return Move.BETRAY
+                return Move.DEFECT
             return Move.COOPERATE
 ```
 
