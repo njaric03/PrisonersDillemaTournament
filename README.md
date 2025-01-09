@@ -8,10 +8,10 @@ Zatvorenikova dilema je klasičan primer iz teorije igara gde dva igrača moraju
 
 ### Pravila bodovanja
 
-- Ako oba bota sarađuju: svaki dobija 3 poena
-- Ako oba bota izdaju: svaki dobija 1 poen
+- Ako oba bota sarađuju: svaki dobija 4 poena
+- Ako oba bota izdaju: svaki dobija 2 poen
 - Ako jedan bot sarađuje a drugi izda:
-  - Bot koji je izdao dobija 5 poena
+  - Bot koji je izdao dobija 6 poena
   - Bot koji je sarađivao dobija 0 poena
 
 **Važno**: Svaki bot će igrati tačno 200 rundi protiv svakog protivničkog bota. Pobednik turnira se određuje isključivo na osnovu ukupnog broja osvojenih poena kroz sve mečeve. Pobede i porazi u pojedinačnim mečevima nisu relevantni - jedino što je bitno je maksimizovanje ukupnog broja poena kroz sve runde i sve mečeve!
