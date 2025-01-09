@@ -128,4 +128,5 @@ python main.py
 
 ## Prezentacija
 https://docs.google.com/presentation/d/1OR8Ov_Zs-CRuGooVO2khpxnL7UL1w6qnsvvv0HgGayc/edit#slide=id.g32346294625_0_537
+
 Srećno takmičenje! 🎮
