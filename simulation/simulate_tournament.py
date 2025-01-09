@@ -158,6 +158,12 @@ class TournamentSimulation:
 
     def _run_match(self, bot1, bot2, rounds, tournament_dir):
         """Run a single match between two bots and return match statistics."""
+        # Reinitialize bots for this match by creating new instances
+        bot1_class = bot1.__class__
+        bot2_class = bot2.__class__
+        bot1 = bot1_class()
+        bot2 = bot2_class()
+        
         scores = {bot1.name: 0, bot2.name: 0}
         stats = {
             'mutual_cooperation': 0,

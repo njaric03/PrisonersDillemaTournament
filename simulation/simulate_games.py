@@ -8,7 +8,7 @@ import random
 
 class PrisonersDilemmaSimulation:
     def __init__(self, bot1_path):
-        self.bot1 = self.load_bot(bot1_path)
+        self.bot1_path = bot1_path  # Store path instead of instance
         
         self.logs_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'logs')
         if not os.path.exists(self.logs_dir):
@@ -42,6 +42,9 @@ class PrisonersDilemmaSimulation:
 
     def run_games(self, opponent_paths, rounds=GameConfig.NUMBER_OF_ROUNDS):
         """Run games against multiple opponents."""
+        # Create fresh instance of bot1
+        self.bot1 = self.load_bot(self.bot1_path)
+        
         timestamp = datetime.now().strftime("%H%M%S")
         games_dir = os.path.join(self.logs_dir, f"{timestamp}_{self.bot1.name}_games")
         os.makedirs(games_dir)
@@ -69,19 +72,18 @@ class PrisonersDilemmaSimulation:
         print(f"Games complete. Results saved to {games_dir}")
 
     def _run_match(self, opponent, rounds, tournament_dir):
+        # Reinitialize both bots for this match
+        bot1 = self.load_bot(self.bot1_path)
+        opponent_class = opponent.__class__
+        opponent = opponent_class()
+
         stats = {
             'mutual_cooperation': 0,
             'mutual_defection': 0,
             'bot1_betrayals': 0,
             'opponent_betrayals': 0,
-            'scores': {self.bot1.name: 0, opponent.name: 0}
+            'scores': {bot1.name: 0, opponent.name: 0}
         }
-
-        # Reset histories at start of match
-        self.bot1.my_history = []
-        self.bot1.opponent_history = []
-        opponent.my_history = []
-        opponent.opponent_history = []
 
         timestamp = datetime.now().strftime("%H%M%S")
         log_filename = f"{timestamp}_vs_{opponent.name}.txt"
@@ -91,7 +93,7 @@ class PrisonersDilemmaSimulation:
         output_lines.extend([
             "="*50,
             f"MATCH RESULTS - {datetime.now().strftime('%Y-%m-%d %H:%M')}",
-            f"Bot 1: {self.bot1.name}",
+            f"Bot 1: {bot1.name}",
             f"Bot 2: {opponent.name}",
             "="*50,
             "",
@@ -101,12 +103,12 @@ class PrisonersDilemmaSimulation:
         ])
 
         for round_num in range(rounds):
-            move1 = self.bot1.make_decision()  # Change strategy([]) to make_decision()
+            move1 = bot1.make_decision()  # Change strategy([]) to make_decision()
             move2 = opponent.make_decision()   # Change strategy([]) to make_decision()
 
             # Update histories for both bots
-            self.bot1.my_history.append(move1)
-            self.bot1.opponent_history.append(move2)
+            bot1.my_history.append(move1)
+            bot1.opponent_history.append(move2)
             opponent.my_history.append(move2)
             opponent.opponent_history.append(move1)
 
@@ -128,10 +130,10 @@ class PrisonersDilemmaSimulation:
                 score1, score2 = GameConfig.MUTUAL_DEFECTION_POINTS, GameConfig.MUTUAL_DEFECTION_POINTS
                 stats['mutual_defection'] += 1
 
-            stats['scores'][self.bot1.name] += score1
+            stats['scores'][bot1.name] += score1
             stats['scores'][opponent.name] += score2
 
-            current_score = f"{stats['scores'][self.bot1.name]:^5} - {stats['scores'][opponent.name]:^5}"
+            current_score = f"{stats['scores'][bot1.name]:^5} - {stats['scores'][opponent.name]:^5}"
             output_lines.append(f"{round_num+1:^6} | {move1.name:^10} | {move2.name:^10} | {round_result:^12} | {current_score}")
 
         output_lines.extend([
@@ -145,7 +147,7 @@ class PrisonersDilemmaSimulation:
             "",
             "FINAL SCORES:",
             "-"*50,
-            f"{self.bot1.name}: {stats['scores'][self.bot1.name]}",
+            f"{bot1.name}: {stats['scores'][bot1.name]}",
             f"{opponent.name}: {stats['scores'][opponent.name]}",
             "="*50
         ])
