@@ -706,11 +706,11 @@ class GameUI:
         try:
             simulation = PrisonersDilemmaSimulation(player1_bot)
             if self.mode == "game":
-                simulation.run_games([opponents[0]], 100)
+                simulation.run_games([opponents[0]])
                 self.update_log(self.read_latest_log("game"))
             else:
                 # For multiple test mode
-                simulation.run_games(opponents, 100)
+                simulation.run_games(opponents)
                 # Force a small delay to ensure file is written
                 self.parent.after(100)  
                 self.update_log(self.read_latest_log("games_summary"))

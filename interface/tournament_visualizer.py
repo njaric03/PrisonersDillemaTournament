@@ -136,7 +136,7 @@ class TournamentVisualizer:
             # Configure colors based on position with themed colors
             position = len(self.df) - self.current_index - 1
             if position == 0:  # First place
-                bg_color = '#FFD700'  # Gold
+                bg_color = '#FFCF40'  # Gold
                 font_size = 40  # All top 3 use same larger font size
             elif position == 1:  # Second place
                 bg_color = '#C0C0C0'  # Silver
