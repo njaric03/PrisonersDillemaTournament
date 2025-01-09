@@ -126,4 +126,6 @@ python main.py
 2. Ukupan broj poena kroz sve mečeve određuje pobednika
 3. Botovi koji pokušavaju da "varaju" biće diskvalifikovani
 
+## Prezentacija
+https://docs.google.com/presentation/d/1OR8Ov_Zs-CRuGooVO2khpxnL7UL1w6qnsvvv0HgGayc/edit#slide=id.g32346294625_0_537
 Srećno takmičenje! 🎮
